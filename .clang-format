@@ -1,0 +1,257 @@
+---
+# ======================================================================
+# ClangFormat 配置说明
+#
+# 使用 clang-format 22.1.8 验证
+#
+# ======================================================================
+
+
+# 针对 C++ 代码，基于 LLVM 风格配置
+Language: Cpp
+BasedOnStyle: LLVM
+Standard: Latest
+
+# ======================================================================
+# 缩进与行宽
+#
+# 示例
+#
+# ```cpp
+# class Example
+# {
+# public:
+#     int value;
+# };
+# ```
+#
+# ======================================================================
+UseTab: Never                                       # 不使用 Tab 进行缩进
+IndentWidth: 4                                      # 使用 4 个空格进行缩进
+ContinuationIndentWidth: 4                          # 换行续写时相对原行再缩进 4 个空格
+ConstructorInitializerIndentWidth: 4                # 构造函数初始化列表缩进 4 个空格
+AccessModifierOffset: -4                            # public 等修饰符相对类缩进 -4，和 class 同级
+ColumnLimit: 100                                    # 目标行宽为 100 列，并非不可超过的硬限制
+PenaltyReturnTypeOnItsOwnLine: 200                  # 返回类型独占一行的惩罚值，200 表示尽量让返回类型与函数名保持同行
+BreakTemplateDeclarations: Yes                      # 模板声明换行
+
+# ======================================================================
+# 大括号换行
+#
+# 类型、函数、命名空间的 { 换行；if/for/while、else/catch 保持同行。
+#
+# 示例
+#
+# ```cpp
+# class Example
+# {
+# public:
+#     void foo()
+#     {
+#         if (ok) {
+#             return;
+#         } else {
+#             return;
+#         }
+#     }
+# };
+# ```
+#
+# ======================================================================
+BreakBeforeBraces: Custom                           # 不使用预设套装，按下面逐项配置
+BraceWrapping:
+  AfterCaseLabel: false                             # case 后的 { 不单独换行
+  AfterClass: true                                  # class 后的 { 换行
+  AfterControlStatement: Never                      # if/for/while 的 { 不换行，与控制语句同行
+  AfterEnum: true                                   # enum 后的 { 换行
+  AfterExternBlock: true                            # extern "C" 后的 { 换行
+  AfterFunction: true                               # 函数定义后的 { 换行
+  AfterNamespace: true                              # namespace 后的 { 换行
+  AfterStruct: true                                 # struct 后的 { 换行
+  AfterUnion: true                                  # union 后的 { 换行
+  BeforeCatch: false                                # } catch 不拆成两行
+  BeforeElse: false                                 # } else 不拆开
+  BeforeLambdaBody: false                           # lambda 的 { 不强制换行
+  BeforeWhile: false                                # do { } while 的 while 不换到下一行
+  IndentBraces: false                               # { } 本身不额外缩进
+  SplitEmptyFunction: false                         # 已换行的空函数花括号不再拆开；结合短函数规则可形成 void f() {}
+  SplitEmptyRecord: false                           # 空类/结构体的 {} 保持同行，如 class C 换行后接 {};
+  SplitEmptyNamespace: false                        # 空命名空间的 {} 保持同行
+
+# ======================================================================
+# 指针与引用风格
+#
+# 示例
+#
+# ```cpp
+# int * value;
+# int & value;
+# ```
+#
+# ======================================================================
+DerivePointerAlignment: false                       # 不从代码推测风格，使用规定的规则
+PointerAlignment: Middle                            # 指针对齐方式为中间对齐，两侧都有空格
+ReferenceAlignment: Pointer                         # 引用对齐方式与指针相同
+QualifierAlignment: Leave                           # const 等修饰符保持原状
+
+# ======================================================================
+# 多行参数与初始化列表
+#
+# 示例
+#
+# ```cpp
+# [[nodiscard]]
+# int value(int a, int b);
+# int value(
+#     int a,
+#     int b,
+#     int c
+# );
+# Foo(int a, int b)
+#     : a_(a)
+#     , b_(b)
+# {
+# }
+# ```
+#
+# ======================================================================
+BreakAfterAttributes: Always                        # 属性组后总是换行；也适用于变量和控制语句前的属性
+AlignAfterOpenBracket: true                         # 未强制换行时，将续行内容与左括号后的首项对齐
+BreakAfterOpenBracketBracedList: true               # 花括号初始化列表换行时，在左花括号后立即换行
+BreakAfterOpenBracketFunction: true                 # 函数调用或声明换行时，在左括号后立即换行
+BreakAfterOpenBracketIf: true                       # if 条件换行时，在左括号后立即换行
+BreakAfterOpenBracketLoop: false                    # for/while 条件换行时，不强制在左括号后立即换行
+BreakAfterOpenBracketSwitch: false                  # switch 条件换行时，不强制在左括号后立即换行
+BreakBeforeCloseBracketBracedList: true             # 多行花括号初始化列表的右花括号单独成行
+BreakBeforeCloseBracketFunction: true               # 多行函数调用或声明的右括号单独成行
+BreakBeforeCloseBracketIf: true                     # 多行 if 条件的右括号单独成行
+BreakBeforeCloseBracketLoop: false                  # 多行 for/while 条件的右括号不强制单独成行
+BreakBeforeCloseBracketSwitch: false                # 多行 switch 条件的右括号不强制单独成行
+BinPackArguments: false                             # 调用实参要么全在同一行，要么每个参数单独一行
+BinPackParameters: OnePerLine                       # 函数形参放不下时每个参数单独一行
+BinPackLongBracedList: false                        # 超过 20 项的初始化列表也不重新启用紧凑排列
+AllowAllArgumentsOnNextLine: false                  # 调用实参不允许 ( 换行后全部挤在一行
+AllowAllParametersOfDeclarationOnNextLine: false    # 函数形参和上述实参风格一致
+ExperimentalAutoDetectBinPacking: false             # 不根据代码推测风格，使用规定的规则
+BreakConstructorInitializers: BeforeComma           # 构造函数初始化列表换行方式为在逗号前换行
+PackConstructorInitializers: Never                  # 构造函数初始化列表不打包，每个初始化单独一行
+BreakInheritanceList: BeforeComma                   # 继承列表换行方式为在逗号前换行
+
+# ======================================================================
+# 避免把实现和控制流压缩成单行
+#
+# 示例
+#
+# ```cpp
+# if (condition) {
+#     return;
+# }
+# ```
+#
+# ======================================================================
+AllowShortBlocksOnASingleLine: Never                # 块不允许压缩成单行，必须换行
+AllowShortFunctionsOnASingleLine: Empty             # 函数只有空体时允许单行
+AllowShortIfStatementsOnASingleLine: Never          # if 语句不允许压缩成单行
+AllowShortLoopsOnASingleLine: false                 # for/while 等不允许压缩成单行
+AllowShortLambdasOnASingleLine: Empty               # lambda 表达式只有空体时允许单行
+AllowShortCaseLabelsOnASingleLine: false            # case 标签不允许压缩成单行
+AllowShortEnumsOnASingleLine: false                 # enum 不允许压缩成单行
+
+# ======================================================================
+# 初始化列表与字符串
+#
+# 示例
+#
+# ```cpp
+# return Foo {1, 2, 3};
+# ```
+#
+# ======================================================================
+Cpp11BracedListStyle: FunctionCall                  # 花括号初始化按函数调用方式排版：内部无额外空格并使用续行缩进
+SpaceBeforeCpp11BracedList: true                    # 类型或标识符与初始化列表的左花括号之间加一个空格
+SpaceInEmptyBraces: Never                           # 空花括号内部不添加空格，如 Foo {}
+BreakStringLiterals: false                          # 不把超长字符串字面量拆为多段字符串，可能会超出列宽限制
+
+# ======================================================================
+# 注释
+#
+# 示例
+#
+# ```cpp
+# namespace a::b::c
+# {
+#
+# class Foo;              // 注释
+#
+# } // namespace a::b::c
+# ```
+#
+# ======================================================================
+ReflowComments: Never                               # 不自动重排或重新缩进注释内容
+AlignTrailingComments:
+  Kind: Never                                       # 不对行尾注释对齐到同一列
+SpacesBeforeTrailingComments: 1                     # 行尾注释前加一个空格
+FixNamespaceComments: true                          # 自动修正命名空间结束注释
+CompactNamespaces: false                            # 不使用紧凑命名空间写法
+
+# ======================================================================
+# 仅在已有 include 分组内排序，不自动重组 include 块
+#
+# 示例
+#
+# ```cpp
+# #include <iostream>
+#
+# #include "bar.hpp"
+# #include "foo.hpp"
+# ```
+#
+# ======================================================================
+SortIncludes: CaseSensitive                         # 按字母顺序排序 include 头文件
+IncludeBlocks: Preserve                             # 保持 include 块的原有结构
+
+# ======================================================================
+# 访问符、case、预处理与空行
+#
+# 示例
+#
+# ```cpp
+# class Example
+# {
+# public:
+#     void foo();
+#
+# private:
+#     int value_;
+# };
+#
+# switch (value) {
+# case 0:
+#     break;
+# default:
+#     break;
+# }
+# ```
+#
+# ======================================================================
+IndentAccessModifiers: false                        # public 等访问符本身不再多缩进一层
+EmptyLineAfterAccessModifier: Never                 # 访问符后面不加空行
+EmptyLineBeforeAccessModifier: Always               # 访问符前加空行，但类型开头的第一个访问符除外
+IndentCaseLabels: false                             # case 相对 switch 不再缩进，与 switch 同级
+IndentPPDirectives: None                            # #if/#define 等预处理指令不缩进
+KeepEmptyLines:
+  AtStartOfBlock: false                             # 删除块开头 { 后的空行
+MaxEmptyLinesToKeep: 1                              # 连续空行最多保留 1 行
+SeparateDefinitionBlocks: Leave                     # 定义块之间的空行保持原样，不强制统一
+
+# ======================================================================
+# 结构转换（默认关闭）
+#
+# 第一版只负责排版，不自动增删括号或分号，避免改变代码结构。
+#
+# ======================================================================
+InsertBraces: false                                 # 不为 if/for/while 等自动补花括号
+RemoveBracesLLVM: false                             # 不按 LLVM 规则删除可省略的花括号
+RemoveParentheses: Leave                            # 括号保持原样，不自动去掉多余的 ()
+RemoveSemicolon: false                              # 不删除非空函数定义右花括号后的分号
+...
