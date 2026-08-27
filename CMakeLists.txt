@@ -12,4 +12,5 @@ enable_testing()
 
 add_subdirectory(src/core/tensor)
 add_subdirectory(src/core/embedding)
+add_subdirectory(src/core/kernels)
 add_subdirectory(tests)
