@@ -1,6 +1,7 @@
 set(LITEINFER_CORE_KERNELS_SOURCES
     rms_norm.cpp
     matmul.cpp
+    matadd.cpp
 )
 
 add_library(liteinfer_core_kernels STATIC ${LITEINFER_CORE_KERNELS_SOURCES})
