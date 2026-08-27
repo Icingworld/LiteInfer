@@ -7,13 +7,14 @@
 #include <type_traits>
 #include <utility>
 
-namespace liteinfer::core::error
+namespace liteinfer::core::common
 {
 
 // 错误码分类
 enum class ErrorCategory : std::uint8_t
 {
     Unknown = 0,
+    Tensor = 1,
 };
 
 // 通用错误类型模板
@@ -85,4 +86,4 @@ private:
     std::string message_;
 };
 
-} // namespace liteinfer::core::error
+} // namespace liteinfer::core::common

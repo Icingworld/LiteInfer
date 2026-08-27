@@ -8,4 +8,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 # 本项目暂不使用 module 特性
 set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 
-add_subdirectory(src/core/tmp)
+enable_testing()
+
+add_subdirectory(src/core/tensor)
+add_subdirectory(tests)
