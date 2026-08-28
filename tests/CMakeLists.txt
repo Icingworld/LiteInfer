@@ -30,3 +30,14 @@ target_link_libraries(liteinfer_kernels_test
 )
 
 add_test(NAME liteinfer_kernels_test COMMAND liteinfer_kernels_test)
+
+add_executable(liteinfer_layer_test
+    linear_test.cpp
+)
+
+target_link_libraries(liteinfer_layer_test
+    PRIVATE
+        liteinfer_core_layer
+)
+
+add_test(NAME liteinfer_layer_test COMMAND liteinfer_layer_test)
