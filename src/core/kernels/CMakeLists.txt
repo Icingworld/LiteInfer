@@ -3,6 +3,7 @@ set(LITEINFER_CORE_KERNELS_SOURCES
     matmul.cpp
     matadd.cpp
     silu_mul.cpp
+    rope.cpp
 )
 
 add_library(liteinfer_core_kernels STATIC ${LITEINFER_CORE_KERNELS_SOURCES})
