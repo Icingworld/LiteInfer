@@ -19,3 +19,14 @@ target_link_libraries(liteinfer_embedding_test
 )
 
 add_test(NAME liteinfer_embedding_test COMMAND liteinfer_embedding_test)
+
+add_executable(liteinfer_kernels_test
+    kernels_test.cpp
+)
+
+target_link_libraries(liteinfer_kernels_test
+    PRIVATE
+        liteinfer_core_kernels
+)
+
+add_test(NAME liteinfer_kernels_test COMMAND liteinfer_kernels_test)
