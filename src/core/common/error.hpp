@@ -16,6 +16,7 @@ enum class ErrorCategory : std::uint8_t
     Unknown = 0,
     Tensor = 1,
     Embedding = 2,
+    Layer = 3,
 };
 
 // 通用错误类型模板
