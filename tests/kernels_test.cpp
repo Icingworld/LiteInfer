@@ -68,6 +68,31 @@ void test_matmul_rectangular_matrices()
     assert_vector_near(output, {58.0F, 64.0F, 139.0F, 154.0F});
 }
 
+void test_matmul_transposed_rhs()
+{
+    const std::vector<float> lhs {
+        1.0F,
+        2.0F,
+        3.0F,
+        4.0F,
+        5.0F,
+        6.0F,
+    };
+    const std::vector<float> rhs {
+        7.0F,
+        8.0F,
+        9.0F,
+        10.0F,
+        11.0F,
+        12.0F,
+    };
+    std::vector<float> output(4);
+
+    matmul_transposed_rhs_f32(lhs, rhs, output, 2, 3, 2);
+
+    assert_vector_near(output, {50.0F, 68.0F, 122.0F, 167.0F});
+}
+
 void test_rms_norm_multiple_rows_and_weights()
 {
     const std::vector<float> input {3.0F, 4.0F, -1.0F, 1.0F};
@@ -170,6 +195,7 @@ int main()
 {
     test_matadd();
     test_matmul_rectangular_matrices();
+    test_matmul_transposed_rhs();
     test_rms_norm_multiple_rows_and_weights();
     test_rope_half_split_rotation();
     test_sdpa_causal_mask();
