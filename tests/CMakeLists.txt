@@ -41,3 +41,14 @@ target_link_libraries(liteinfer_layer_test
 )
 
 add_test(NAME liteinfer_layer_test COMMAND liteinfer_layer_test)
+
+add_executable(liteinfer_rms_norm_test
+    rms_norm_test.cpp
+)
+
+target_link_libraries(liteinfer_rms_norm_test
+    PRIVATE
+        liteinfer_core_layer
+)
+
+add_test(NAME liteinfer_rms_norm_test COMMAND liteinfer_rms_norm_test)
