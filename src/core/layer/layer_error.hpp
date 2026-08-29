@@ -14,6 +14,7 @@ enum class LayerErrorCode : std::uint8_t
     InvalidBias = 1,
     InvalidInput = 2,
     UnsupportedDataType = 3,
+    InvalidEpsilon = 4,
 };
 
 // Layer 错误类型

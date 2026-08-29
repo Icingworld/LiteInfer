@@ -1,5 +1,6 @@
 set(LITEINFER_CORE_LAYER_SOURCES
     linear.cpp
+    rms_norm.cpp
 )
 
 add_library(liteinfer_core_layer STATIC ${LITEINFER_CORE_LAYER_SOURCES})
