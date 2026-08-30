@@ -52,3 +52,14 @@ target_link_libraries(liteinfer_rms_norm_test
 )
 
 add_test(NAME liteinfer_rms_norm_test COMMAND liteinfer_rms_norm_test)
+
+add_executable(liteinfer_qwen3_mlp_test
+    qwen3_mlp_test.cpp
+)
+
+target_link_libraries(liteinfer_qwen3_mlp_test
+    PRIVATE
+        liteinfer_core_model_qwen3
+)
+
+add_test(NAME liteinfer_qwen3_mlp_test COMMAND liteinfer_qwen3_mlp_test)
