@@ -1,5 +1,6 @@
 set(LITEINFER_CORE_MODEL_QWEN3_SOURCES
     qwen3_attention.cpp
+    qwen3_decoder_layer.cpp
     qwen3_mlp.cpp
 )
 
