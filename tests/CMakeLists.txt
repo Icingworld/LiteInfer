@@ -74,3 +74,14 @@ target_link_libraries(liteinfer_qwen3_attention_test
 )
 
 add_test(NAME liteinfer_qwen3_attention_test COMMAND liteinfer_qwen3_attention_test)
+
+add_executable(liteinfer_qwen3_decoder_layer_test
+    qwen3_decoder_layer_test.cpp
+)
+
+target_link_libraries(liteinfer_qwen3_decoder_layer_test
+    PRIVATE
+        liteinfer_core_model_qwen3
+)
+
+add_test(NAME liteinfer_qwen3_decoder_layer_test COMMAND liteinfer_qwen3_decoder_layer_test)
