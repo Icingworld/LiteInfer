@@ -9,7 +9,9 @@ namespace liteinfer::core::model
 
 // 模型错误码
 enum class ModelErrorCode : std::uint8_t
-{};
+{
+    InvalidConfiguration = 0,
+};
 
 // 模型错误类型
 using ModelError = common::Error;

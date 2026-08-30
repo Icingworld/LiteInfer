@@ -39,6 +39,10 @@ public:
     [[nodiscard]]
     std::size_t out_features() const noexcept;
 
+    // 是否包含偏置
+    [[nodiscard]]
+    bool has_bias() const noexcept;
+
 private:
     tensor::Tensor weight_;
     std::optional<tensor::Tensor> bias_;

@@ -165,4 +165,9 @@ std::size_t Linear::out_features() const noexcept
     return *weight_.shape().extent(0);
 }
 
+bool Linear::has_bias() const noexcept
+{
+    return bias_.has_value();
+}
+
 } // namespace liteinfer::core::layer
