@@ -11,6 +11,7 @@ namespace liteinfer::core::model
 enum class ModelErrorCode : std::uint8_t
 {
     InvalidConfiguration = 0,
+    InvalidInput = 1,
 };
 
 // 模型错误类型
