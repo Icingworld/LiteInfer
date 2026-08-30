@@ -17,6 +17,7 @@ enum class ErrorCategory : std::uint8_t
     Tensor = 1,
     Embedding = 2,
     Layer = 3,
+    Model = 4,
 };
 
 // 通用错误类型模板
