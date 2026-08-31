@@ -16,7 +16,7 @@ Linear::Linear(tensor::Tensor weight, std::optional<tensor::Tensor> bias)
 std::expected<Linear, LayerError>
 Linear::create(tensor::Tensor weight, std::optional<tensor::Tensor> bias)
 {
-    if (weight.rank() != 2) {
+    if (weight.rank() != 2) [[unlikely]] {
         return std::unexpected(
             LayerError(LayerErrorCode::InvalidWeight, "Linear weight must be a 2D tensor")
         );
@@ -25,41 +25,41 @@ Linear::create(tensor::Tensor weight, std::optional<tensor::Tensor> bias)
     const auto weight_shape = weight.shape().values();
     const std::size_t out_features = weight_shape[0];
     const std::size_t in_features = weight_shape[1];
-    if (out_features == 0 || in_features == 0) {
+    if (out_features == 0 || in_features == 0) [[unlikely]] {
         return std::unexpected(
             LayerError(LayerErrorCode::InvalidWeight, "Linear weight must be non-empty")
         );
     }
 
-    if (weight.data_type() != tensor::DataType::Float32) {
+    if (weight.data_type() != tensor::DataType::Float32) [[unlikely]] {
         return std::unexpected(LayerError(
             LayerErrorCode::UnsupportedDataType,
             "Linear weight must use Float32 data type"
         ));
     }
 
-    if (!weight.is_contiguous()) {
+    if (!weight.is_contiguous()) [[unlikely]] {
         return std::unexpected(
             LayerError(LayerErrorCode::InvalidWeight, "Linear weight must be contiguous")
         );
     }
 
     if (bias) {
-        if (bias->rank() != 1 || *bias->shape().extent(0) != out_features) {
+        if (bias->rank() != 1 || *bias->shape().extent(0) != out_features) [[unlikely]] {
             return std::unexpected(LayerError(
                 LayerErrorCode::InvalidBias,
                 "Linear bias must have shape [out_features]"
             ));
         }
 
-        if (bias->data_type() != tensor::DataType::Float32) {
+        if (bias->data_type() != tensor::DataType::Float32) [[unlikely]] {
             return std::unexpected(LayerError(
                 LayerErrorCode::UnsupportedDataType,
                 "Linear bias must use Float32 data type"
             ));
         }
 
-        if (!bias->is_contiguous()) {
+        if (!bias->is_contiguous()) [[unlikely]] {
             return std::unexpected(
                 LayerError(LayerErrorCode::InvalidBias, "Linear bias must be contiguous")
             );
@@ -71,20 +71,20 @@ Linear::create(tensor::Tensor weight, std::optional<tensor::Tensor> bias)
 
 std::expected<tensor::Tensor, LayerError> Linear::forward(const tensor::Tensor & input) const
 {
-    if (input.rank() == 0) {
+    if (input.rank() == 0) [[unlikely]] {
         return std::unexpected(LayerError(
             LayerErrorCode::InvalidInput,
             "Linear input must have at least one dimension"
         ));
     }
 
-    if (!input.is_contiguous()) {
+    if (!input.is_contiguous()) [[unlikely]] {
         return std::unexpected(
             LayerError(LayerErrorCode::InvalidInput, "Linear input must be contiguous")
         );
     }
 
-    if (input.data_type() != tensor::DataType::Float32) {
+    if (input.data_type() != tensor::DataType::Float32) [[unlikely]] {
         return std::unexpected(LayerError(
             LayerErrorCode::UnsupportedDataType,
             "Linear input must use Float32 data type"
@@ -92,7 +92,7 @@ std::expected<tensor::Tensor, LayerError> Linear::forward(const tensor::Tensor &
     }
 
     const auto input_shape = input.shape().values();
-    if (input_shape.back() != in_features()) {
+    if (input_shape.back() != in_features()) [[unlikely]] {
         return std::unexpected(LayerError(
             LayerErrorCode::InvalidInput,
             "Linear input feature dimension does not match the weight"
@@ -106,22 +106,22 @@ std::expected<tensor::Tensor, LayerError> Linear::forward(const tensor::Tensor &
         tensor::DataType::Float32,
         tensor::Shape(std::move(output_dimensions))
     );
-    if (!output) {
+    if (!output) [[unlikely]] {
         return std::unexpected(std::move(output).error());
     }
 
     auto input_values = input.data_as<float>();
-    if (!input_values) {
+    if (!input_values) [[unlikely]] {
         return std::unexpected(std::move(input_values).error());
     }
 
     auto weight_values = weight_.data_as<float>();
-    if (!weight_values) {
+    if (!weight_values) [[unlikely]] {
         return std::unexpected(std::move(weight_values).error());
     }
 
     auto output_values = output->data_as<float>();
-    if (!output_values) {
+    if (!output_values) [[unlikely]] {
         return std::unexpected(std::move(output_values).error());
     }
 
@@ -138,7 +138,7 @@ std::expected<tensor::Tensor, LayerError> Linear::forward(const tensor::Tensor &
 
         if (bias_) {
             auto bias_values = bias_->data_as<float>();
-            if (!bias_values) {
+            if (!bias_values) [[unlikely]] {
                 return std::unexpected(std::move(bias_values).error());
             }
 

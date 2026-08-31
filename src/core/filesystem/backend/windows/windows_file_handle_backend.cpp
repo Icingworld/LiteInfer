@@ -103,7 +103,7 @@ std::expected<void, FilesystemError> WindowsFileHandleBackend::close()
 
     // CloseHandle 失败后句柄状态不应再被本对象使用，因此先清空所有权。
     void * native_handle = std::exchange(native_handle_, nullptr);
-    if (!::CloseHandle(as_handle(native_handle))) {
+    if (!::CloseHandle(as_handle(native_handle))) [[unlikely]] {
         return std::unexpected(
             FilesystemError {
                 detail::map_error(::GetLastError()),
@@ -117,7 +117,7 @@ std::expected<void, FilesystemError> WindowsFileHandleBackend::close()
 std::expected<std::size_t, FilesystemError>
 WindowsFileHandleBackend::read_at(std::uint64_t offset, std::span<std::byte> buffer)
 {
-    if (is_closed(native_handle_)) {
+    if (is_closed(native_handle_)) [[unlikely]] {
         return std::unexpected(
             FilesystemError {
                 FilesystemErrorCode::ClosedHandle,
@@ -125,7 +125,7 @@ WindowsFileHandleBackend::read_at(std::uint64_t offset, std::span<std::byte> buf
             }
         );
     }
-    if (!valid_read_range(offset, buffer.size())) {
+    if (!valid_read_range(offset, buffer.size())) [[unlikely]] {
         return std::unexpected(
             FilesystemError {FilesystemErrorCode::InvalidArgument, "Invalid offset or buffer size"}
         );
@@ -142,7 +142,7 @@ WindowsFileHandleBackend::read_at(std::uint64_t offset, std::span<std::byte> buf
 
         OVERLAPPED overlapped {};
         EventGuard event_guard(::CreateEventW(nullptr, TRUE, FALSE, nullptr));
-        if (event_guard.handle() == nullptr) {
+        if (event_guard.handle() == nullptr) [[unlikely]] {
             return std::unexpected(
                 FilesystemError {
                     detail::map_error(::GetLastError()),
@@ -175,21 +175,21 @@ WindowsFileHandleBackend::read_at(std::uint64_t offset, std::span<std::byte> buf
                         TRUE
                     )) {
                     error = ::GetLastError();
-                    if (error == ERROR_HANDLE_EOF) {
+                    if (error == ERROR_HANDLE_EOF) [[likely]] {
                         break;
                     }
                     return std::unexpected(
                         FilesystemError {detail::map_error(error), "Failed to read from file"}
                     );
                 }
-            } else {
+            } else [[unlikely]] {
                 return std::unexpected(
                     FilesystemError {detail::map_error(error), "Failed to read from file"}
                 );
             }
         }
 
-        if (bytes_read > chunk_size) {
+        if (bytes_read > chunk_size) [[unlikely]] {
             return std::unexpected(
                 FilesystemError {
                     FilesystemErrorCode::IoError,
@@ -208,7 +208,7 @@ WindowsFileHandleBackend::read_at(std::uint64_t offset, std::span<std::byte> buf
 
 std::expected<std::uint64_t, FilesystemError> WindowsFileHandleBackend::size()
 {
-    if (is_closed(native_handle_)) {
+    if (is_closed(native_handle_)) [[unlikely]] {
         return std::unexpected(
             FilesystemError {
                 FilesystemErrorCode::ClosedHandle,
@@ -218,12 +218,12 @@ std::expected<std::uint64_t, FilesystemError> WindowsFileHandleBackend::size()
     }
 
     LARGE_INTEGER file_size {};
-    if (!::GetFileSizeEx(as_handle(native_handle_), &file_size)) {
+    if (!::GetFileSizeEx(as_handle(native_handle_), &file_size)) [[unlikely]] {
         return std::unexpected(
             FilesystemError {detail::map_error(::GetLastError()), "Failed to get file size"}
         );
     }
-    if (file_size.QuadPart < 0) {
+    if (file_size.QuadPart < 0) [[unlikely]] {
         return std::unexpected(
             FilesystemError {
                 FilesystemErrorCode::IoError,

@@ -27,7 +27,7 @@ FileHandle::~FileHandle() = default;
 
 std::expected<FileHandle, FilesystemError> FileHandle::create(std::unique_ptr<backend::FileHandleBackend> backend)
 {
-    if (backend == nullptr) {
+    if (backend == nullptr) [[unlikely]] {
         return std::unexpected(FilesystemError {
             FilesystemErrorCode::InvalidState,
             "Create file handle failed because backend is invalid"
@@ -38,7 +38,7 @@ std::expected<FileHandle, FilesystemError> FileHandle::create(std::unique_ptr<ba
 
 std::expected<void, FilesystemError> FileHandle::close()
 {
-    if (backend_ == nullptr) {
+    if (backend_ == nullptr) [[unlikely]] {
         return std::unexpected(FilesystemError {
             FilesystemErrorCode::InvalidState,
             "Close file failed because backend is invalid"
@@ -49,7 +49,7 @@ std::expected<void, FilesystemError> FileHandle::close()
 
 std::expected<std::size_t, FilesystemError> FileHandle::read_at(std::uint64_t offset, std::span<std::byte> buffer)
 {
-    if (backend_ == nullptr) {
+    if (backend_ == nullptr) [[unlikely]] {
         return std::unexpected(FilesystemError {
             FilesystemErrorCode::InvalidState,
             "Read file failed because backend is invalid"
@@ -60,7 +60,7 @@ std::expected<std::size_t, FilesystemError> FileHandle::read_at(std::uint64_t of
 
 std::expected<std::uint64_t, FilesystemError> FileHandle::size()
 {
-    if (backend_ == nullptr) {
+    if (backend_ == nullptr) [[unlikely]] {
         return std::unexpected(FilesystemError {
             FilesystemErrorCode::InvalidState,
             "Get size failed because backend is invalid"

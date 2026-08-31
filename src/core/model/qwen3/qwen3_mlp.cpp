@@ -19,21 +19,21 @@ Qwen3MLP::create(layer::Linear gate_proj, layer::Linear up_proj, layer::Linear d
     const std::size_t hidden_size = gate_proj.in_features();
     const std::size_t intermediate_size = gate_proj.out_features();
 
-    if (up_proj.in_features() != hidden_size || up_proj.out_features() != intermediate_size) {
+    if (up_proj.in_features() != hidden_size || up_proj.out_features() != intermediate_size) [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidConfiguration,
             "Qwen3 MLP gate and up projections must have matching dimensions"
         ));
     }
 
-    if (down_proj.in_features() != intermediate_size || down_proj.out_features() != hidden_size) {
+    if (down_proj.in_features() != intermediate_size || down_proj.out_features() != hidden_size) [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidConfiguration,
             "Qwen3 MLP down projection dimensions must reverse the gate projection"
         ));
     }
 
-    if (gate_proj.has_bias() || up_proj.has_bias() || down_proj.has_bias()) {
+    if (gate_proj.has_bias() || up_proj.has_bias() || down_proj.has_bias()) [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidConfiguration,
             "Qwen3 MLP projections must not contain bias"
@@ -46,32 +46,32 @@ Qwen3MLP::create(layer::Linear gate_proj, layer::Linear up_proj, layer::Linear d
 std::expected<tensor::Tensor, ModelError> Qwen3MLP::forward(const tensor::Tensor & input) const
 {
     auto gate = gate_proj_.forward(input);
-    if (!gate) {
+    if (!gate) [[unlikely]] {
         return std::unexpected(std::move(gate).error());
     }
 
     auto up = up_proj_.forward(input);
-    if (!up) {
+    if (!up) [[unlikely]] {
         return std::unexpected(std::move(up).error());
     }
 
     auto intermediate = tensor::Tensor::allocate(tensor::DataType::Float32, gate->shape());
-    if (!intermediate) {
+    if (!intermediate) [[unlikely]] {
         return std::unexpected(std::move(intermediate).error());
     }
 
     auto gate_values = gate->data_as<float>();
-    if (!gate_values) {
+    if (!gate_values) [[unlikely]] {
         return std::unexpected(std::move(gate_values).error());
     }
 
     auto up_values = up->data_as<float>();
-    if (!up_values) {
+    if (!up_values) [[unlikely]] {
         return std::unexpected(std::move(up_values).error());
     }
 
     auto intermediate_values = intermediate->data_as<float>();
-    if (!intermediate_values) {
+    if (!intermediate_values) [[unlikely]] {
         return std::unexpected(std::move(intermediate_values).error());
     }
 

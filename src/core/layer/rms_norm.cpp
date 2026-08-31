@@ -16,32 +16,32 @@ RMSNorm::RMSNorm(tensor::Tensor weight, float eps)
 
 std::expected<RMSNorm, LayerError> RMSNorm::create(tensor::Tensor weight, float eps)
 {
-    if (weight.rank() != 1) {
+    if (weight.rank() != 1) [[unlikely]] {
         return std::unexpected(
             LayerError(LayerErrorCode::InvalidWeight, "RMSNorm weight must be a 1D tensor")
         );
     }
 
-    if (*weight.shape().extent(0) == 0) {
+    if (*weight.shape().extent(0) == 0) [[unlikely]] {
         return std::unexpected(
             LayerError(LayerErrorCode::InvalidWeight, "RMSNorm weight must be non-empty")
         );
     }
 
-    if (weight.data_type() != tensor::DataType::Float32) {
+    if (weight.data_type() != tensor::DataType::Float32) [[unlikely]] {
         return std::unexpected(LayerError(
             LayerErrorCode::UnsupportedDataType,
             "RMSNorm weight must use Float32 data type"
         ));
     }
 
-    if (!weight.is_contiguous()) {
+    if (!weight.is_contiguous()) [[unlikely]] {
         return std::unexpected(
             LayerError(LayerErrorCode::InvalidWeight, "RMSNorm weight must be contiguous")
         );
     }
 
-    if (!std::isfinite(eps) || eps <= 0.0F) {
+    if (!std::isfinite(eps) || eps <= 0.0F) [[unlikely]] {
         return std::unexpected(LayerError(
             LayerErrorCode::InvalidEpsilon,
             "RMSNorm epsilon must be finite and greater than zero"
@@ -53,20 +53,20 @@ std::expected<RMSNorm, LayerError> RMSNorm::create(tensor::Tensor weight, float 
 
 std::expected<tensor::Tensor, LayerError> RMSNorm::forward(const tensor::Tensor & input) const
 {
-    if (input.rank() == 0) {
+    if (input.rank() == 0) [[unlikely]] {
         return std::unexpected(LayerError(
             LayerErrorCode::InvalidInput,
             "RMSNorm input must have at least one dimension"
         ));
     }
 
-    if (!input.is_contiguous()) {
+    if (!input.is_contiguous()) [[unlikely]] {
         return std::unexpected(
             LayerError(LayerErrorCode::InvalidInput, "RMSNorm input must be contiguous")
         );
     }
 
-    if (input.data_type() != tensor::DataType::Float32) {
+    if (input.data_type() != tensor::DataType::Float32) [[unlikely]] {
         return std::unexpected(LayerError(
             LayerErrorCode::UnsupportedDataType,
             "RMSNorm input must use Float32 data type"
@@ -74,7 +74,7 @@ std::expected<tensor::Tensor, LayerError> RMSNorm::forward(const tensor::Tensor 
     }
 
     const auto input_shape = input.shape().values();
-    if (input_shape.back() != normalized_size()) {
+    if (input_shape.back() != normalized_size()) [[unlikely]] {
         return std::unexpected(LayerError(
             LayerErrorCode::InvalidInput,
             "RMSNorm input normalized dimension does not match the weight"
@@ -86,22 +86,22 @@ std::expected<tensor::Tensor, LayerError> RMSNorm::forward(const tensor::Tensor 
         tensor::DataType::Float32,
         tensor::Shape(std::move(output_dimensions))
     );
-    if (!output) {
+    if (!output) [[unlikely]] {
         return std::unexpected(std::move(output).error());
     }
 
     auto input_values = input.data_as<float>();
-    if (!input_values) {
+    if (!input_values) [[unlikely]] {
         return std::unexpected(std::move(input_values).error());
     }
 
     auto weight_values = weight_.data_as<float>();
-    if (!weight_values) {
+    if (!weight_values) [[unlikely]] {
         return std::unexpected(std::move(weight_values).error());
     }
 
     auto output_values = output->data_as<float>();
-    if (!output_values) {
+    if (!output_values) [[unlikely]] {
         return std::unexpected(std::move(output_values).error());
     }
 

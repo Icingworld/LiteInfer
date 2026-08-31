@@ -21,7 +21,7 @@ std::expected<Strides, TensorError> Strides::from_shape(const Shape & shape)
         strides[index] = stride;
 
         const std::size_t dim = dimensions[index];
-        if (dim != 0 && stride > std::numeric_limits<std::size_t>::max() / dim) {
+        if (dim != 0 && stride > std::numeric_limits<std::size_t>::max() / dim) [[unlikely]] {
             return std::unexpected(TensorError(TensorErrorCode::Overflow, "Strides overflow"));
         }
         stride *= dim;
@@ -36,7 +36,7 @@ std::size_t Strides::rank() const noexcept
 
 std::expected<std::size_t, TensorError> Strides::stride(std::size_t index) const noexcept
 {
-    if (index >= strides_.size()) {
+    if (index >= strides_.size()) [[unlikely]] {
         return std::unexpected(
             TensorError(TensorErrorCode::IndexOutOfRange, "Strides index out of range")
         );

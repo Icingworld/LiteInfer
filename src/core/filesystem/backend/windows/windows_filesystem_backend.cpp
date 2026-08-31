@@ -26,7 +26,7 @@ validate_path_and_options(const std::filesystem::path & path, const FileOpenOpti
 {
     const auto & native_path = path.native();
     if (native_path.empty() || native_path.find(std::filesystem::path::value_type {}) !=
-                                   std::filesystem::path::string_type::npos) {
+                                   std::filesystem::path::string_type::npos) [[unlikely]] {
         return std::unexpected(
             FilesystemError {
                 FilesystemErrorCode::InvalidPath,
@@ -35,7 +35,7 @@ validate_path_and_options(const std::filesystem::path & path, const FileOpenOpti
         );
     }
     if (options.access != FileAccess::ReadOnly ||
-        options.create_mode != FileCreateMode::OpenExisting) {
+        options.create_mode != FileCreateMode::OpenExisting) [[unlikely]] {
         return std::unexpected(
             FilesystemError {
                 FilesystemErrorCode::InvalidArgument,
@@ -50,7 +50,7 @@ validate_path_and_options(const std::filesystem::path & path, const FileOpenOpti
 std::expected<DWORD, FilesystemError> get_attributes(const std::filesystem::path & path)
 {
     const DWORD attributes = ::GetFileAttributesW(path.c_str());
-    if (attributes != INVALID_FILE_ATTRIBUTES) {
+    if (attributes != INVALID_FILE_ATTRIBUTES) [[likely]] {
         return attributes;
     }
     return std::unexpected(
@@ -64,15 +64,15 @@ std::expected<FileHandle, FilesystemError>
 WindowsFilesystemBackend::open(const std::filesystem::path & path, const FileOpenOptions & options)
 {
     auto validation = validate_path_and_options(path, options);
-    if (!validation.has_value()) {
+    if (!validation.has_value()) [[unlikely]] {
         return std::unexpected(std::move(validation.error()));
     }
 
     auto attributes = get_attributes(path);
-    if (!attributes.has_value()) {
+    if (!attributes.has_value()) [[unlikely]] {
         return std::unexpected(std::move(attributes.error()));
     }
-    if ((*attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) {
+    if ((*attributes & FILE_ATTRIBUTE_DIRECTORY) != 0) [[unlikely]] {
         return std::unexpected(
             FilesystemError {
                 FilesystemErrorCode::NotAFile,
@@ -91,7 +91,7 @@ WindowsFilesystemBackend::open(const std::filesystem::path & path, const FileOpe
         flags,
         nullptr
     );
-    if (native_handle == INVALID_HANDLE_VALUE) {
+    if (native_handle == INVALID_HANDLE_VALUE) [[unlikely]] {
         return std::unexpected(
             FilesystemError {detail::map_error(::GetLastError()), "Open file failed"}
         );
@@ -106,7 +106,7 @@ std::expected<bool, FilesystemError> WindowsFilesystemBackend::exists(
 )
 {
     const DWORD attributes = ::GetFileAttributesW(path.c_str());
-    if (attributes != INVALID_FILE_ATTRIBUTES) {
+    if (attributes != INVALID_FILE_ATTRIBUTES) [[likely]] {
         return true;
     }
 

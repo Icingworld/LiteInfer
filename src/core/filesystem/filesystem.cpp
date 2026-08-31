@@ -27,7 +27,7 @@ Filesystem::~Filesystem() = default;
 
 std::expected<Filesystem, FilesystemError> Filesystem::create(std::unique_ptr<backend::FilesystemBackend> backend)
 {
-    if (backend == nullptr) {
+    if (backend == nullptr) [[unlikely]] {
         return std::unexpected(FilesystemError {
             FilesystemErrorCode::InvalidState,
             "Create filesystem failed because backend is invalid"
@@ -38,7 +38,7 @@ std::expected<Filesystem, FilesystemError> Filesystem::create(std::unique_ptr<ba
 
 std::expected<FileHandle, FilesystemError> Filesystem::open(const std::filesystem::path & path, const FileOpenOptions & options)
 {
-    if (backend_ == nullptr) {
+    if (backend_ == nullptr) [[unlikely]] {
         return std::unexpected(FilesystemError {
             FilesystemErrorCode::InvalidState,
             "Open file failed because filesystem is invalid"
@@ -49,7 +49,7 @@ std::expected<FileHandle, FilesystemError> Filesystem::open(const std::filesyste
 
 std::expected<bool, FilesystemError> Filesystem::exists(const std::filesystem::path & path)
 {
-    if (backend_ == nullptr) {
+    if (backend_ == nullptr) [[unlikely]] {
         return std::unexpected(FilesystemError {
             FilesystemErrorCode::InvalidState,
             "Check file existence failed because filesystem is invalid"

@@ -22,14 +22,14 @@ lookup(const tensor::Tensor & weight, const tensor::Tensor & token_ids)
     const std::size_t embedding_dim = weight_shape[1];
 
     auto ids = token_ids.data_as<Id>();
-    if (!ids) {
+    if (!ids) [[unlikely]] {
         return std::unexpected(std::move(ids).error());
     }
 
     // 检查所有的 token_id 是否合法
     for (const Id id : *ids) {
         if constexpr (std::is_signed_v<Id>) {
-            if (id < 0) {
+            if (id < 0) [[unlikely]] {
                 return std::unexpected(EmbeddingError(
                     EmbeddingErrorCode::InvalidTokenId,
                     "Token ID must not be negative"
@@ -37,7 +37,7 @@ lookup(const tensor::Tensor & weight, const tensor::Tensor & token_ids)
             }
         }
 
-        if (static_cast<std::uintmax_t>(id) >= vocab_size) {
+        if (static_cast<std::uintmax_t>(id) >= vocab_size) [[unlikely]] {
             return std::unexpected(EmbeddingError(
                 EmbeddingErrorCode::InvalidTokenId,
                 "Token ID is out of vocabulary range"
@@ -54,7 +54,7 @@ lookup(const tensor::Tensor & weight, const tensor::Tensor & token_ids)
 
     auto output =
         tensor::Tensor::allocate(weight.data_type(), tensor::Shape(std::move(output_dimensions)));
-    if (!output) {
+    if (!output) [[unlikely]] {
         return std::unexpected(std::move(output).error());
     }
 
@@ -83,13 +83,13 @@ Embedding::Embedding(tensor::Tensor weight)
 std::expected<Embedding, EmbeddingError> Embedding::create(tensor::Tensor weight)
 {
     // 验证权重矩阵
-    if (weight.rank() != 2) {
+    if (weight.rank() != 2) [[unlikely]] {
         return std::unexpected(EmbeddingError(
             EmbeddingErrorCode::InvalidWeightMatrix,
             "Weight matrix must be a 2D tensor"
         ));
     }
-    if (*weight.shape().extent(0) == 0 || *weight.shape().extent(1) == 0) {
+    if (*weight.shape().extent(0) == 0 || *weight.shape().extent(1) == 0) [[unlikely]] {
         return std::unexpected(EmbeddingError(
             EmbeddingErrorCode::InvalidWeightMatrix,
             "Weight matrix must be a non-empty tensor"
@@ -97,13 +97,13 @@ std::expected<Embedding, EmbeddingError> Embedding::create(tensor::Tensor weight
     }
     if (weight.data_type() != tensor::DataType::Float16 &&
         weight.data_type() != tensor::DataType::Float32 &&
-        weight.data_type() != tensor::DataType::BFloat16) {
+        weight.data_type() != tensor::DataType::BFloat16) [[unlikely]] {
         return std::unexpected(EmbeddingError(
             EmbeddingErrorCode::InvalidWeightMatrix,
             "Weight matrix must be a Float16, Float32 or BFloat16 tensor"
         ));
     }
-    if (!weight.is_contiguous()) {
+    if (!weight.is_contiguous()) [[unlikely]] {
         return std::unexpected(EmbeddingError(
             EmbeddingErrorCode::InvalidWeightMatrix,
             "Weight matrix must be a contiguous tensor"
@@ -120,13 +120,13 @@ std::expected<tensor::Tensor, EmbeddingError> Embedding::forward(
     // 判断输入是一阶的 [S] 还是二阶的 [B, S]
     const auto input_rank = token_ids.rank();
 
-    if (input_rank != 1 && input_rank != 2) {
+    if (input_rank != 1 && input_rank != 2) [[unlikely]] {
         return std::unexpected(
             EmbeddingError(EmbeddingErrorCode::InvalidInputRank, "Input must be a 1D or 2D tensor")
         );
     }
 
-    if (!token_ids.is_contiguous()) {
+    if (!token_ids.is_contiguous()) [[unlikely]] {
         return std::unexpected(
             EmbeddingError(EmbeddingErrorCode::InvalidInput, "Input must be a contiguous tensor")
         );
@@ -137,7 +137,7 @@ std::expected<tensor::Tensor, EmbeddingError> Embedding::forward(
         return lookup<std::int32_t>(weight_, token_ids);
     case tensor::DataType::Int64:
         return lookup<std::int64_t>(weight_, token_ids);
-    default:
+    [[unlikely]] default:
         return std::unexpected(EmbeddingError(
             EmbeddingErrorCode::UnsupportedInputDataType,
             "Input must use Int32 or Int64 data type"

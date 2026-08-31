@@ -49,7 +49,7 @@ std::expected<Qwen3Attention, ModelError> Qwen3Attention::create(
 )
 {
     if (num_attention_heads == 0 || num_key_value_heads == 0 ||
-        num_attention_heads % num_key_value_heads != 0) {
+        num_attention_heads % num_key_value_heads != 0) [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidConfiguration,
             "Qwen3 Attention head counts must be non-zero and query heads must divide by KV heads"
@@ -57,21 +57,21 @@ std::expected<Qwen3Attention, ModelError> Qwen3Attention::create(
     }
 
     const std::size_t head_dim = q_norm.normalized_size();
-    if (head_dim == 0 || head_dim % 2 != 0 || k_norm.normalized_size() != head_dim) {
+    if (head_dim == 0 || head_dim % 2 != 0 || k_norm.normalized_size() != head_dim) [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidConfiguration,
             "Qwen3 Attention Q/K norms must use the same non-zero even head dimension"
         ));
     }
 
-    if (q_norm.eps() != k_norm.eps()) {
+    if (q_norm.eps() != k_norm.eps()) [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidConfiguration,
             "Qwen3 Attention Q/K norms must use the same epsilon"
         ));
     }
 
-    if (!std::isfinite(rope_theta) || rope_theta <= 0.0F) {
+    if (!std::isfinite(rope_theta) || rope_theta <= 0.0F) [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidConfiguration,
             "Qwen3 Attention RoPE theta must be finite and greater than zero"
@@ -79,7 +79,7 @@ std::expected<Qwen3Attention, ModelError> Qwen3Attention::create(
     }
 
     if (head_dim > std::numeric_limits<std::size_t>::max() / num_attention_heads ||
-        head_dim > std::numeric_limits<std::size_t>::max() / num_key_value_heads) {
+        head_dim > std::numeric_limits<std::size_t>::max() / num_key_value_heads) [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidConfiguration,
             "Qwen3 Attention projection dimension overflow"
@@ -93,7 +93,7 @@ std::expected<Qwen3Attention, ModelError> Qwen3Attention::create(
     if (q_proj.out_features() != query_width || k_proj.in_features() != hidden_size ||
         k_proj.out_features() != key_value_width || v_proj.in_features() != hidden_size ||
         v_proj.out_features() != key_value_width || o_proj.in_features() != query_width ||
-        o_proj.out_features() != hidden_size) {
+        o_proj.out_features() != hidden_size) [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidConfiguration,
             "Qwen3 Attention projection dimensions do not match the head configuration"
@@ -102,7 +102,7 @@ std::expected<Qwen3Attention, ModelError> Qwen3Attention::create(
 
     const bool attention_bias = q_proj.has_bias();
     if (k_proj.has_bias() != attention_bias || v_proj.has_bias() != attention_bias ||
-        o_proj.has_bias() != attention_bias) {
+        o_proj.has_bias() != attention_bias) [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidConfiguration,
             "Qwen3 Attention projections must use a consistent bias configuration"
@@ -127,7 +127,7 @@ std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward(
     const tensor::Tensor & input
 ) const
 {
-    if (input.rank() < 2) {
+    if (input.rank() < 2) [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidInput,
             "Qwen3 Attention input must have shape [..., sequence_length, hidden_size]"
@@ -135,21 +135,21 @@ std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward(
     }
 
     auto query = q_proj_.forward(input);
-    if (!query) {
+    if (!query) [[unlikely]] {
         return std::unexpected(std::move(query).error());
     }
 
-    if (input.empty()) {
+    if (input.empty()) [[unlikely]] {
         return o_proj_.forward(*query);
     }
 
     auto key = k_proj_.forward(input);
-    if (!key) {
+    if (!key) [[unlikely]] {
         return std::unexpected(std::move(key).error());
     }
 
     auto value = v_proj_.forward(input);
-    if (!value) {
+    if (!value) [[unlikely]] {
         return std::unexpected(std::move(value).error());
     }
 
@@ -158,7 +158,7 @@ std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward(
         tensor::Shape {query->numel() / head_dim_, head_dim_},
         query->data()
     );
-    if (!query_rows) {
+    if (!query_rows) [[unlikely]] {
         return std::unexpected(std::move(query_rows).error());
     }
 
@@ -167,48 +167,48 @@ std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward(
         tensor::Shape {key->numel() / head_dim_, head_dim_},
         key->data()
     );
-    if (!key_rows) {
+    if (!key_rows) [[unlikely]] {
         return std::unexpected(std::move(key_rows).error());
     }
 
     auto normalized_query = q_norm_.forward(*query_rows);
-    if (!normalized_query) {
+    if (!normalized_query) [[unlikely]] {
         return std::unexpected(std::move(normalized_query).error());
     }
 
     auto normalized_key = k_norm_.forward(*key_rows);
-    if (!normalized_key) {
+    if (!normalized_key) [[unlikely]] {
         return std::unexpected(std::move(normalized_key).error());
     }
 
     auto rotated_query =
         tensor::Tensor::allocate(tensor::DataType::Float32, normalized_query->shape());
-    if (!rotated_query) {
+    if (!rotated_query) [[unlikely]] {
         return std::unexpected(std::move(rotated_query).error());
     }
 
     auto rotated_key = tensor::Tensor::allocate(tensor::DataType::Float32, normalized_key->shape());
-    if (!rotated_key) {
+    if (!rotated_key) [[unlikely]] {
         return std::unexpected(std::move(rotated_key).error());
     }
 
     auto normalized_query_values = normalized_query->data_as<float>();
-    if (!normalized_query_values) {
+    if (!normalized_query_values) [[unlikely]] {
         return std::unexpected(std::move(normalized_query_values).error());
     }
 
     auto normalized_key_values = normalized_key->data_as<float>();
-    if (!normalized_key_values) {
+    if (!normalized_key_values) [[unlikely]] {
         return std::unexpected(std::move(normalized_key_values).error());
     }
 
     auto rotated_query_values = rotated_query->data_as<float>();
-    if (!rotated_query_values) {
+    if (!rotated_query_values) [[unlikely]] {
         return std::unexpected(std::move(rotated_query_values).error());
     }
 
     auto rotated_key_values = rotated_key->data_as<float>();
-    if (!rotated_key_values) {
+    if (!rotated_key_values) [[unlikely]] {
         return std::unexpected(std::move(rotated_key_values).error());
     }
 
@@ -267,17 +267,17 @@ std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward(
     }
 
     auto attention_output = tensor::Tensor::allocate(tensor::DataType::Float32, query->shape());
-    if (!attention_output) {
+    if (!attention_output) [[unlikely]] {
         return std::unexpected(std::move(attention_output).error());
     }
 
     auto value_values = value->data_as<float>();
-    if (!value_values) {
+    if (!value_values) [[unlikely]] {
         return std::unexpected(std::move(value_values).error());
     }
 
     auto attention_output_values = attention_output->data_as<float>();
-    if (!attention_output_values) {
+    if (!attention_output_values) [[unlikely]] {
         return std::unexpected(std::move(attention_output_values).error());
     }
 

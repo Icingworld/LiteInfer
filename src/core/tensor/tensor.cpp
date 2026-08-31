@@ -45,7 +45,7 @@ constexpr std::size_t element_size_of(DataType data_type) noexcept
 std::expected<std::size_t, TensorError> element_size(DataType data_type) noexcept
 {
     const std::size_t size = element_size_of(data_type);
-    if (size == 0) {
+    if (size == 0) [[unlikely]] {
         return std::unexpected(
             TensorError(TensorErrorCode::InvalidDataType, "Unsupported tensor data type")
         );
@@ -60,18 +60,18 @@ std::expected<TensorLayout, TensorError>
 compute_layout(DataType data_type, const Shape & shape) noexcept
 {
     auto numel = shape.numel();
-    if (!numel) {
+    if (!numel) [[unlikely]] {
         return std::unexpected(std::move(numel).error());
     }
 
     auto element_size_result = element_size(data_type);
-    if (!element_size_result) {
+    if (!element_size_result) [[unlikely]] {
         return std::unexpected(std::move(element_size_result).error());
     }
 
     const std::size_t count = *numel;
     const std::size_t element_bytes = *element_size_result;
-    if (count != 0 && element_bytes > std::numeric_limits<std::size_t>::max() / count) {
+    if (count != 0 && element_bytes > std::numeric_limits<std::size_t>::max() / count) [[unlikely]] {
         return std::unexpected(TensorError(TensorErrorCode::Overflow, "Tensor byte size overflow"));
     }
 
@@ -103,14 +103,14 @@ Tensor::Tensor(
 std::expected<Tensor, TensorError> Tensor::allocate(DataType data_type, Shape shape)
 {
     auto layout = compute_layout(data_type, shape);
-    if (!layout) {
+    if (!layout) [[unlikely]] {
         return std::unexpected(std::move(layout).error());
     }
 
     std::vector<std::byte> data(layout->bytes, std::byte {0});
 
     auto strides = Strides::from_shape(shape);
-    if (!strides) {
+    if (!strides) [[unlikely]] {
         return std::unexpected(std::move(strides).error());
     }
 
@@ -128,11 +128,11 @@ std::expected<Tensor, TensorError>
 Tensor::from_bytes(DataType data_type, Shape shape, std::span<const std::byte> bytes)
 {
     auto layout = compute_layout(data_type, shape);
-    if (!layout) {
+    if (!layout) [[unlikely]] {
         return std::unexpected(std::move(layout).error());
     }
 
-    if (bytes.size() != layout->bytes) {
+    if (bytes.size() != layout->bytes) [[unlikely]] {
         return std::unexpected(
             TensorError(TensorErrorCode::InvalidByteSize, "Tensor byte size mismatch")
         );
@@ -141,7 +141,7 @@ Tensor::from_bytes(DataType data_type, Shape shape, std::span<const std::byte> b
     std::vector<std::byte> data(bytes.begin(), bytes.end());
 
     auto strides = Strides::from_shape(shape);
-    if (!strides) {
+    if (!strides) [[unlikely]] {
         return std::unexpected(std::move(strides).error());
     }
 
@@ -194,14 +194,14 @@ bool Tensor::is_contiguous() const noexcept
 {
     const auto dimensions = shape_.values();
     const auto stride_values = strides_.values();
-    if (dimensions.size() != stride_values.size()) {
+    if (dimensions.size() != stride_values.size()) [[unlikely]] {
         return false;
     }
 
     std::size_t expected_stride = 1;
     for (std::size_t i = dimensions.size(); i > 0; --i) {
         const std::size_t index = i - 1;
-        if (stride_values[index] != expected_stride) {
+        if (stride_values[index] != expected_stride) [[unlikely]] {
             return false;
         }
 

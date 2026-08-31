@@ -21,7 +21,7 @@ std::size_t Shape::rank() const noexcept
 
 std::expected<std::size_t, TensorError> Shape::extent(std::size_t index) const noexcept
 {
-    if (index >= dimensions_.size()) {
+    if (index >= dimensions_.size()) [[unlikely]] {
         return std::unexpected(
             TensorError(TensorErrorCode::IndexOutOfRange, "Shape index out of range")
         );
@@ -35,7 +35,7 @@ std::expected<std::size_t, TensorError> Shape::numel() const noexcept
     std::size_t result = 1;
 
     for (const auto dim : dimensions_) {
-        if (dim != 0 && result > std::numeric_limits<std::size_t>::max() / dim) {
+        if (dim != 0 && result > std::numeric_limits<std::size_t>::max() / dim) [[unlikely]] {
             return std::unexpected(
                 TensorError(TensorErrorCode::Overflow, "Shape dimension overflow")
             );

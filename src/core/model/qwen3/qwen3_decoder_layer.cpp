@@ -20,7 +20,7 @@ add_residual(const tensor::Tensor & residual, const tensor::Tensor & branch_outp
     if (residual.data_type() != tensor::DataType::Float32 ||
         branch_output.data_type() != tensor::DataType::Float32 ||
         residual_shape.size() != branch_shape.size() ||
-        !std::equal(residual_shape.begin(), residual_shape.end(), branch_shape.begin())) {
+        !std::equal(residual_shape.begin(), residual_shape.end(), branch_shape.begin())) [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidConfiguration,
             "Qwen3 DecoderLayer residual tensors must have matching Float32 shapes"
@@ -28,22 +28,22 @@ add_residual(const tensor::Tensor & residual, const tensor::Tensor & branch_outp
     }
 
     auto output = tensor::Tensor::allocate(tensor::DataType::Float32, residual.shape());
-    if (!output) {
+    if (!output) [[unlikely]] {
         return std::unexpected(std::move(output).error());
     }
 
     auto residual_values = residual.data_as<float>();
-    if (!residual_values) {
+    if (!residual_values) [[unlikely]] {
         return std::unexpected(std::move(residual_values).error());
     }
 
     auto branch_values = branch_output.data_as<float>();
-    if (!branch_values) {
+    if (!branch_values) [[unlikely]] {
         return std::unexpected(std::move(branch_values).error());
     }
 
     auto output_values = output->data_as<float>();
-    if (!output_values) {
+    if (!output_values) [[unlikely]] {
         return std::unexpected(std::move(output_values).error());
     }
 
@@ -73,7 +73,7 @@ std::expected<Qwen3DecoderLayer, ModelError> Qwen3DecoderLayer::create(
 )
 {
     const std::size_t hidden_size = self_attn.hidden_size();
-    if (mlp.hidden_size() != hidden_size) {
+    if (mlp.hidden_size() != hidden_size) [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidConfiguration,
             "Qwen3 DecoderLayer Attention and MLP hidden sizes must match"
@@ -81,14 +81,14 @@ std::expected<Qwen3DecoderLayer, ModelError> Qwen3DecoderLayer::create(
     }
 
     if (input_layernorm.normalized_size() != hidden_size ||
-        post_attention_layernorm.normalized_size() != hidden_size) {
+        post_attention_layernorm.normalized_size() != hidden_size) [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidConfiguration,
             "Qwen3 DecoderLayer RMSNorm dimensions must match the hidden size"
         ));
     }
 
-    if (input_layernorm.eps() != post_attention_layernorm.eps()) {
+    if (input_layernorm.eps() != post_attention_layernorm.eps()) [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidConfiguration,
             "Qwen3 DecoderLayer RMSNorm layers must use the same epsilon"
@@ -107,7 +107,7 @@ std::expected<tensor::Tensor, ModelError> Qwen3DecoderLayer::forward(
     const tensor::Tensor & input
 ) const
 {
-    if (input.rank() < 2) {
+    if (input.rank() < 2) [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidInput,
             "Qwen3 DecoderLayer input must have shape [..., sequence_length, hidden_size]"
@@ -115,27 +115,27 @@ std::expected<tensor::Tensor, ModelError> Qwen3DecoderLayer::forward(
     }
 
     auto attention_input = input_layernorm_.forward(input);
-    if (!attention_input) {
+    if (!attention_input) [[unlikely]] {
         return std::unexpected(std::move(attention_input).error());
     }
 
     auto attention_output = self_attn_.forward(*attention_input);
-    if (!attention_output) {
+    if (!attention_output) [[unlikely]] {
         return std::unexpected(std::move(attention_output).error());
     }
 
     auto hidden_states = add_residual(input, *attention_output);
-    if (!hidden_states) {
+    if (!hidden_states) [[unlikely]] {
         return std::unexpected(std::move(hidden_states).error());
     }
 
     auto mlp_input = post_attention_layernorm_.forward(*hidden_states);
-    if (!mlp_input) {
+    if (!mlp_input) [[unlikely]] {
         return std::unexpected(std::move(mlp_input).error());
     }
 
     auto mlp_output = mlp_.forward(*mlp_input);
-    if (!mlp_output) {
+    if (!mlp_output) [[unlikely]] {
         return std::unexpected(std::move(mlp_output).error());
     }
 
