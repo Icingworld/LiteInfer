@@ -75,6 +75,17 @@ target_link_libraries(liteinfer_qwen3_config_test
 
 add_test(NAME liteinfer_qwen3_config_test COMMAND liteinfer_qwen3_config_test)
 
+add_executable(liteinfer_qwen3_model_test
+    qwen3_model_test.cpp
+)
+
+target_link_libraries(liteinfer_qwen3_model_test
+    PRIVATE
+        liteinfer_core_model_qwen3
+)
+
+add_test(NAME liteinfer_qwen3_model_test COMMAND liteinfer_qwen3_model_test)
+
 add_executable(liteinfer_qwen3_attention_test
     qwen3_attention_test.cpp
 )
