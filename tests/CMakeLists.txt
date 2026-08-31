@@ -86,6 +86,17 @@ target_link_libraries(liteinfer_qwen3_decoder_layer_test
 
 add_test(NAME liteinfer_qwen3_decoder_layer_test COMMAND liteinfer_qwen3_decoder_layer_test)
 
+add_executable(liteinfer_io_test
+    io_test.cpp
+)
+
+target_link_libraries(liteinfer_io_test
+    PRIVATE
+        liteinfer_core_io
+)
+
+add_test(NAME liteinfer_io_test COMMAND liteinfer_io_test)
+
 if(UNIX OR WIN32)
     add_executable(liteinfer_filesystem_test
         filesystem_test.cpp
