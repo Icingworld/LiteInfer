@@ -26,6 +26,7 @@
 #endif
 #include "core/json/json.hpp"
 #include "core/model/model_error.hpp"
+#include "core/model/qwen3/qwen3_generator.hpp"
 #include "core/model/qwen3/qwen3_model.hpp"
 #include "core/tensor/tensor.hpp"
 
@@ -34,6 +35,7 @@ namespace
 
 using namespace liteinfer::core;
 using model::ModelErrorCode;
+using model::qwen3::Qwen3Generator;
 using model::qwen3::Qwen3Model;
 
 #if defined(_WIN32)
@@ -346,6 +348,39 @@ void test_forward_validation()
     assert(invalid_token_result.error().category() == common::ErrorCategory::Embedding);
 }
 
+void test_greedy_generation()
+{
+    TemporaryModel fixture;
+    auto filesystem = make_filesystem();
+    auto model_result = Qwen3Model::load(filesystem, fixture.directory());
+    assert(model_result.has_value());
+
+    Qwen3Generator generator(*model_result);
+    const std::vector<common::TokenId> prompt {0};
+
+    auto generated = generator.generate(prompt, 3);
+    assert(generated.has_value());
+    assert(*generated == std::vector<common::TokenId>({0, 0, 0, 0}));
+
+    auto eos_generated = generator.generate(prompt, 5, 0);
+    assert(eos_generated.has_value());
+    assert(*eos_generated == std::vector<common::TokenId>({0, 0}));
+
+    auto no_new_tokens = generator.generate(prompt, 0);
+    assert(no_new_tokens.has_value());
+    assert(*no_new_tokens == prompt);
+
+    const std::vector<common::TokenId> empty_prompt;
+    auto empty_result = generator.generate(empty_prompt, 1);
+    assert(!empty_result.has_value());
+    assert(empty_result.error().category() == common::ErrorCategory::Model);
+    assert(empty_result.error().code() == std::to_underlying(ModelErrorCode::InvalidInput));
+
+    auto too_many = generator.generate(prompt, 8);
+    assert(!too_many.has_value());
+    assert(too_many.error().code() == std::to_underlying(ModelErrorCode::InvalidInput));
+}
+
 void test_missing_weights()
 {
     TemporaryModel fixture;
@@ -363,5 +398,6 @@ int main()
 {
     test_load_and_forward();
     test_forward_validation();
+    test_greedy_generation();
     test_missing_weights();
 }
