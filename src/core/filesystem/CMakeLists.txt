@@ -8,6 +8,11 @@ if(UNIX)
         backend/posix/posix_file_handle_backend.cpp
         backend/posix/posix_filesystem_backend.cpp
     )
+elseif(WIN32)
+    list(APPEND LITEINFER_CORE_FILESYSTEM_SOURCES
+        backend/windows/windows_file_handle_backend.cpp
+        backend/windows/windows_filesystem_backend.cpp
+    )
 endif()
 
 add_library(liteinfer_core_filesystem STATIC ${LITEINFER_CORE_FILESYSTEM_SOURCES})
