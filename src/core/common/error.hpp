@@ -20,6 +20,7 @@ enum class ErrorCategory : std::uint8_t
     Model = 4,
     Io = 5,
     Filesystem = 6,
+    Safetensor = 7,
 };
 
 // 通用错误类型模板
