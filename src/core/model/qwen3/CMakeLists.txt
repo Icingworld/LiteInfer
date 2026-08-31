@@ -2,6 +2,7 @@ set(LITEINFER_CORE_MODEL_QWEN3_SOURCES
     qwen3_attention.cpp
     qwen3_config.cpp
     qwen3_decoder_layer.cpp
+    qwen3_model.cpp
     qwen3_mlp.cpp
 )
 
@@ -14,8 +15,11 @@ target_include_directories(liteinfer_core_model_qwen3
 
 target_link_libraries(liteinfer_core_model_qwen3
     PUBLIC
+        liteinfer_core_embedding
+        liteinfer_core_filesystem
         liteinfer_core_layer
         liteinfer_core_json
+        liteinfer_core_safetensor
     PRIVATE
         liteinfer_core_kernels
         liteinfer_core_io
