@@ -5,9 +5,7 @@
 #include <string>
 #include <string_view>
 #include <utility>
-#include <vector>
 
-#include "core/safetensor/safetensor_error.hpp"
 #include "core/safetensor/safetensor_file.hpp"
 
 namespace liteinfer::core::model::qwen3

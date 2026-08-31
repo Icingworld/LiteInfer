@@ -17,8 +17,8 @@
 namespace liteinfer::core::model::qwen3
 {
 
-// Qwen3 基础语言模型。
-// 当前版本只支持 Float32、full attention 和无 KV cache 的完整序列推理。
+// Qwen3 基础语言模型
+// 当前版本只支持 Float32、full attention 和无 KV cache 的完整序列推理
 class Qwen3Model final
 {
 private:
@@ -31,30 +31,30 @@ private:
     );
 
 public:
-    // 从模型目录加载 config.json 和 model.safetensors，并组装完整网络。
+    // 从模型目录加载 config.json 和 model.safetensors，并组装完整网络
     [[nodiscard]]
     static std::expected<Qwen3Model, ModelError>
     load(filesystem::Filesystem & filesystem, const std::filesystem::path & model_directory);
 
-    // 执行一次完整序列前向传播。
+    // 执行一次完整序列前向传播
     // token_ids: [sequence_length] 或 [batch_size, sequence_length]
     // output: [sequence_length, vocab_size] 或 [batch_size, sequence_length, vocab_size]
     [[nodiscard]]
     std::expected<tensor::Tensor, ModelError> forward(const tensor::Tensor & token_ids) const;
 
-    // 获取模型配置。
+    // 获取模型配置
     [[nodiscard]]
     const Qwen3Config & config() const noexcept;
 
-    // 获取词汇表大小。
+    // 获取词汇表大小
     [[nodiscard]]
     std::size_t vocab_size() const noexcept;
 
-    // 获取隐藏层大小。
+    // 获取隐藏层大小
     [[nodiscard]]
     std::size_t hidden_size() const noexcept;
 
-    // 获取 DecoderLayer 数量。
+    // 获取 DecoderLayer 数量
     [[nodiscard]]
     std::size_t num_hidden_layers() const noexcept;
 
