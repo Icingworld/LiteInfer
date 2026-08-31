@@ -1,4 +1,8 @@
+#if defined(_WIN32)
+#include <process.h>
+#else
 #include <unistd.h>
+#endif
 
 #include <array>
 #include <cassert>
@@ -13,7 +17,11 @@
 #include <utility>
 
 #include "core/common/error.hpp"
+#if defined(_WIN32)
+#include "core/filesystem/backend/windows/windows_filesystem_backend.hpp"
+#else
 #include "core/filesystem/backend/posix/posix_filesystem_backend.hpp"
+#endif
 #include "core/filesystem/file_handle.hpp"
 #include "core/filesystem/file_options.hpp"
 #include "core/filesystem/filesystem.hpp"
@@ -24,7 +32,11 @@ namespace
 
 using namespace liteinfer::core;
 using namespace liteinfer::core::filesystem;
+#if defined(_WIN32)
+using filesystem::backend::windows::WindowsFilesystemBackend;
+#else
 using filesystem::backend::posix::PosixFilesystemBackend;
+#endif
 
 constexpr std::string_view FILE_CONTENT = "LiteInfer";
 
@@ -34,7 +46,13 @@ public:
     TemporaryFixture()
         : directory_(
               std::filesystem::temp_directory_path() /
-              ("liteinfer_filesystem_test_" + std::to_string(::getpid()))
+              ("liteinfer_filesystem_test_" +
+#if defined(_WIN32)
+               std::to_string(static_cast<unsigned long long>(::_getpid()))
+#else
+               std::to_string(static_cast<unsigned long long>(::getpid()))
+#endif
+              )
           )
         , file_(directory_ / "model.bin")
     {
@@ -77,7 +95,11 @@ private:
 
 Filesystem make_filesystem()
 {
+#if defined(_WIN32)
+    auto result = Filesystem::create(std::make_unique<WindowsFilesystemBackend>());
+#else
     auto result = Filesystem::create(std::make_unique<PosixFilesystemBackend>());
+#endif
     assert(result.has_value());
     return std::move(*result);
 }

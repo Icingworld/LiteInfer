@@ -86,7 +86,7 @@ target_link_libraries(liteinfer_qwen3_decoder_layer_test
 
 add_test(NAME liteinfer_qwen3_decoder_layer_test COMMAND liteinfer_qwen3_decoder_layer_test)
 
-if(UNIX)
+if(UNIX OR WIN32)
     add_executable(liteinfer_filesystem_test
         filesystem_test.cpp
     )
