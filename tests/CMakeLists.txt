@@ -97,6 +97,17 @@ target_link_libraries(liteinfer_io_test
 
 add_test(NAME liteinfer_io_test COMMAND liteinfer_io_test)
 
+add_executable(liteinfer_safetensor_test
+    safetensor_test.cpp
+)
+
+target_link_libraries(liteinfer_safetensor_test
+    PRIVATE
+        liteinfer_core_safetensor
+)
+
+add_test(NAME liteinfer_safetensor_test COMMAND liteinfer_safetensor_test)
+
 if(UNIX OR WIN32)
     add_executable(liteinfer_filesystem_test
         filesystem_test.cpp
