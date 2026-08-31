@@ -18,6 +18,8 @@ enum class ErrorCategory : std::uint8_t
     Embedding = 2,
     Layer = 3,
     Model = 4,
+    Io = 5,
+    Filesystem = 6,
 };
 
 // 通用错误类型模板
