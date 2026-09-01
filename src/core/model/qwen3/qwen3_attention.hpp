@@ -51,7 +51,7 @@ public:
     [[nodiscard]]
     std::expected<tensor::Tensor, ModelError> forward(const tensor::Tensor & input) const;
 
-    // 使用指定 layer 的 KV cache 前向传播。
+    // 使用指定 layer 的 KV cache 前向传播
     // input: [sequence_length, hidden_size] 或 [1, sequence_length, hidden_size]
     // region: 当前 forward 预留的 cache 区间，范围为 [start, end)
     [[nodiscard]]

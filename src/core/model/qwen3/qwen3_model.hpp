@@ -47,12 +47,12 @@ public:
     [[nodiscard]]
     std::expected<kvcache::KVCache, ModelError> create_kv_cache() const;
 
-    // 处理一段输入并将每层产生的 K/V 写入 cache，返回最后一个位置的 logits [1, vocab_size]。
+    // 处理一段输入并将每层产生的 K/V 写入 cache，返回最后一个位置的 logits [1, vocab_size]
     [[nodiscard]]
     std::expected<tensor::Tensor, ModelError>
     prefill(const tensor::Tensor & token_ids, kvcache::KVCache & cache) const;
 
-    // 处理一个新 token 并追加到 cache，返回当前 token 的 logits [1, vocab_size]。
+    // 处理一个新 token 并追加到 cache，返回当前 token 的 logits [1, vocab_size]
     [[nodiscard]]
     std::expected<tensor::Tensor, ModelError>
     decode(const tensor::Tensor & token_ids, kvcache::KVCache & cache) const;

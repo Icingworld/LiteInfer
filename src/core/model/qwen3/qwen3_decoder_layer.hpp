@@ -41,7 +41,7 @@ public:
     [[nodiscard]]
     std::expected<tensor::Tensor, ModelError> forward(const tensor::Tensor & input) const;
 
-    // 使用指定 cache region 执行当前 DecoderLayer。
+    // 使用指定 cache region 执行当前 DecoderLayer
     [[nodiscard]]
     std::expected<tensor::Tensor, ModelError> forward(
         const tensor::Tensor & input,
