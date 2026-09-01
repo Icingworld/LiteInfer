@@ -11,6 +11,7 @@ set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 enable_testing()
 
 add_subdirectory(src/core/tensor)
+add_subdirectory(src/core/kvcache)
 add_subdirectory(src/core/embedding)
 add_subdirectory(src/core/kernels)
 add_subdirectory(src/core/layer)
