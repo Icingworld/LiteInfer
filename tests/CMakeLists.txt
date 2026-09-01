@@ -142,3 +142,15 @@ if(UNIX OR WIN32)
 
     add_test(NAME liteinfer_filesystem_test COMMAND liteinfer_filesystem_test)
 endif()
+
+add_executable(liteinfer_qwen3_tokenizer_test
+    qwen3_tokenizer_test.cpp
+)
+
+target_link_libraries(liteinfer_qwen3_tokenizer_test
+    PRIVATE
+        liteinfer_core_tokenizer_qwen3
+        liteinfer_core_json
+)
+
+add_test(NAME liteinfer_qwen3_tokenizer_test COMMAND liteinfer_qwen3_tokenizer_test)
