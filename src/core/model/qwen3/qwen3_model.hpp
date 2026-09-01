@@ -7,6 +7,7 @@
 
 #include "core/embedding/embedding.hpp"
 #include "core/filesystem/filesystem.hpp"
+#include "core/kvcache/kvcache.hpp"
 #include "core/layer/linear.hpp"
 #include "core/layer/rms_norm.hpp"
 #include "core/model/model_error.hpp"
@@ -18,7 +19,7 @@ namespace liteinfer::core::model::qwen3
 {
 
 // Qwen3 基础语言模型
-// 当前版本只支持 Float32、full attention 和无 KV cache 的完整序列推理
+// 当前版本支持 Float32、full attention、完整序列推理以及连续静态 KV cache 推理
 class Qwen3Model final
 {
 private:
@@ -42,6 +43,20 @@ public:
     [[nodiscard]]
     std::expected<tensor::Tensor, ModelError> forward(const tensor::Tensor & token_ids) const;
 
+    // 为单请求生成一个与模型配置匹配的静态 KV cache。
+    [[nodiscard]]
+    std::expected<kvcache::KVCache, ModelError> create_kv_cache() const;
+
+    // 处理一段输入并将每层产生的 K/V 写入 cache，返回最后一个位置的 logits [1, vocab_size]。
+    [[nodiscard]]
+    std::expected<tensor::Tensor, ModelError>
+    prefill(const tensor::Tensor & token_ids, kvcache::KVCache & cache) const;
+
+    // 处理一个新 token 并追加到 cache，返回当前 token 的 logits [1, vocab_size]。
+    [[nodiscard]]
+    std::expected<tensor::Tensor, ModelError>
+    decode(const tensor::Tensor & token_ids, kvcache::KVCache & cache) const;
+
     // 获取模型配置
     [[nodiscard]]
     const Qwen3Config & config() const noexcept;
@@ -59,6 +74,13 @@ public:
     std::size_t num_hidden_layers() const noexcept;
 
 private:
+    [[nodiscard]]
+    std::expected<tensor::Tensor, ModelError> forward_cached(
+        const tensor::Tensor & token_ids,
+        kvcache::KVCache & cache,
+        bool decode_mode
+    ) const;
+
     Qwen3Config config_;
     embedding::Embedding embed_tokens_;
     std::vector<Qwen3DecoderLayer> layers_;

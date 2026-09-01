@@ -172,6 +172,80 @@ std::expected<layer::RMSNorm, ModelError> load_rms_norm(
     return std::move(*result);
 }
 
+ModelError cache_model_error(const kvcache::KVCacheError & error)
+{
+    return ModelError(ModelErrorCode::InvalidInput, error.message());
+}
+
+class KVCacheAppendGuard final
+{
+public:
+    KVCacheAppendGuard(kvcache::KVCache & cache, const kvcache::KVCacheRegion & region) noexcept
+        : cache_(&cache)
+        , region_(region)
+    {}
+
+    KVCacheAppendGuard(const KVCacheAppendGuard &) = delete;
+
+    KVCacheAppendGuard & operator=(const KVCacheAppendGuard &) = delete;
+
+    ~KVCacheAppendGuard()
+    {
+        if (cache_ != nullptr) {
+            (void)cache_->abort(region_);
+        }
+    }
+
+    void dismiss() noexcept
+    {
+        cache_ = nullptr;
+    }
+
+private:
+    kvcache::KVCache * cache_;
+    kvcache::KVCacheRegion region_;
+};
+
+std::expected<tensor::Tensor, ModelError>
+take_last_logits(const tensor::Tensor & logits, std::size_t sequence_length, std::size_t vocab_size)
+{
+    if (sequence_length == 0 || vocab_size == 0 ||
+        logits.data_type() != tensor::DataType::Float32 || !logits.is_contiguous()) [[unlikely]] {
+        return std::unexpected(
+            invalid_configuration("Qwen3Model cannot extract logits from an invalid tensor")
+        );
+    }
+
+    const auto shape = logits.shape().values();
+    const bool rank_two =
+        shape.size() == 2 && shape[0] == sequence_length && shape[1] == vocab_size;
+    const bool rank_three =
+        shape.size() == 3 && shape[0] == 1 && shape[1] == sequence_length && shape[2] == vocab_size;
+    if ((!rank_two && !rank_three) ||
+        sequence_length > std::numeric_limits<std::size_t>::max() / vocab_size ||
+        logits.numel() != sequence_length * vocab_size) [[unlikely]] {
+        return std::unexpected(
+            invalid_configuration("Qwen3Model returned an unexpected logits shape")
+        );
+    }
+
+    if (vocab_size > std::numeric_limits<std::size_t>::max() / sizeof(float)) [[unlikely]] {
+        return std::unexpected(invalid_configuration("Qwen3Model logits size overflows size_t"));
+    }
+
+    auto output =
+        tensor::Tensor::allocate(tensor::DataType::Float32, tensor::Shape {1, vocab_size});
+    if (!output) [[unlikely]] {
+        return std::unexpected(std::move(output).error());
+    }
+
+    const std::size_t row_bytes = vocab_size * sizeof(float);
+    const auto source = logits.data();
+    auto destination = output->data();
+    std::memcpy(destination.data(), source.data() + (sequence_length - 1) * row_bytes, row_bytes);
+    return std::move(*output);
+}
+
 } // namespace
 
 Qwen3Model::Qwen3Model(
@@ -456,6 +530,128 @@ std::expected<tensor::Tensor, ModelError> Qwen3Model::forward(
         return std::unexpected(std::move(logits).error());
     }
     return std::move(*logits);
+}
+
+std::expected<kvcache::KVCache, ModelError> Qwen3Model::create_kv_cache() const
+{
+    auto result = kvcache::KVCache::create(
+        kvcache::KVCacheConfig {
+            .num_layers = config_.num_hidden_layers(),
+            .batch_size = 1,
+            .num_kv_heads = config_.num_key_value_heads(),
+            .max_seq_len = config_.max_position_embeddings(),
+            .head_dim = config_.head_dim(),
+            .dtype = tensor::DataType::Float32,
+        }
+    );
+    if (!result) [[unlikely]] {
+        return std::unexpected(cache_model_error(result.error()));
+    }
+    return std::move(*result);
+}
+
+std::expected<tensor::Tensor, ModelError>
+Qwen3Model::prefill(const tensor::Tensor & token_ids, kvcache::KVCache & cache) const
+{
+    return forward_cached(token_ids, cache, false);
+}
+
+std::expected<tensor::Tensor, ModelError>
+Qwen3Model::decode(const tensor::Tensor & token_ids, kvcache::KVCache & cache) const
+{
+    return forward_cached(token_ids, cache, true);
+}
+
+std::expected<tensor::Tensor, ModelError> Qwen3Model::forward_cached(
+    const tensor::Tensor & token_ids,
+    kvcache::KVCache & cache,
+    bool decode_mode
+) const
+{
+    if (token_ids.rank() != 1 && token_ids.rank() != 2) [[unlikely]] {
+        return std::unexpected(ModelError(
+            ModelErrorCode::InvalidInput,
+            "Qwen3Model cached token IDs must have shape [sequence_length] or "
+            "[1, sequence_length]"
+        ));
+    }
+
+    const auto input_shape = token_ids.shape().values();
+    if (token_ids.rank() == 2 && input_shape[0] != 1) [[unlikely]] {
+        return std::unexpected(ModelError(
+            ModelErrorCode::InvalidInput,
+            "Qwen3Model cached inference supports batch_size == 1 only"
+        ));
+    }
+
+    const std::size_t sequence_length = input_shape.back();
+    if (sequence_length == 0) [[unlikely]] {
+        return std::unexpected(ModelError(
+            ModelErrorCode::InvalidInput,
+            "Qwen3Model cached input sequence must not be empty"
+        ));
+    }
+    if (decode_mode && sequence_length != 1) [[unlikely]] {
+        return std::unexpected(ModelError(
+            ModelErrorCode::InvalidInput,
+            "Qwen3Model decode input must contain exactly one token"
+        ));
+    }
+    if (cache.length() > config_.max_position_embeddings() ||
+        sequence_length > config_.max_position_embeddings() - cache.length()) [[unlikely]] {
+        return std::unexpected(ModelError(
+            ModelErrorCode::InvalidInput,
+            "Qwen3Model cached sequence exceeds max_position_embeddings"
+        ));
+    }
+
+    auto region_result = cache.begin_append(sequence_length);
+    if (!region_result) [[unlikely]] {
+        return std::unexpected(cache_model_error(region_result.error()));
+    }
+    const auto region = *region_result;
+    KVCacheAppendGuard transaction(cache, region);
+
+    const auto fail = [](ModelError failure) -> std::expected<tensor::Tensor, ModelError> {
+        return std::unexpected(std::move(failure));
+    };
+
+    auto hidden_states = embed_tokens_.forward(token_ids);
+    if (!hidden_states) [[unlikely]] {
+        return fail(std::move(hidden_states).error());
+    }
+    tensor::Tensor hidden = std::move(*hidden_states);
+
+    for (std::size_t layer_index = 0; layer_index < layers_.size(); ++layer_index) {
+        auto layer_output = layers_[layer_index].forward(hidden, cache, layer_index, region);
+        if (!layer_output) [[unlikely]] {
+            return fail(std::move(layer_output).error());
+        }
+        hidden = std::move(*layer_output);
+    }
+
+    auto normalized = norm_.forward(hidden);
+    if (!normalized) [[unlikely]] {
+        return fail(std::move(normalized).error());
+    }
+
+    auto logits = lm_head_.forward(*normalized);
+    if (!logits) [[unlikely]] {
+        return fail(std::move(logits).error());
+    }
+
+    auto last_logits = take_last_logits(*logits, sequence_length, vocab_size());
+    if (!last_logits) [[unlikely]] {
+        return fail(std::move(last_logits).error());
+    }
+
+    auto commit = cache.commit(region);
+    if (!commit) [[unlikely]] {
+        return fail(cache_model_error(commit.error()));
+    }
+
+    transaction.dismiss();
+    return std::move(*last_logits);
 }
 
 const Qwen3Config & Qwen3Model::config() const noexcept

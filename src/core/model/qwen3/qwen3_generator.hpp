@@ -14,7 +14,7 @@ namespace liteinfer::core::model::qwen3
 {
 
 // 基于 Qwen3Model 的 token ID 级 greedy generation
-// 当前版本每一步都会重新计算完整序列，不使用 KV cache
+// 使用 prefill/decode 和连续静态 KV cache
 class Qwen3Generator final
 {
 public:

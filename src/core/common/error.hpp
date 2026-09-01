@@ -22,6 +22,7 @@ enum class ErrorCategory : std::uint8_t
     Filesystem = 6,
     Safetensors = 7,
     Tokenizer = 8,
+    KVCache = 9,
 };
 
 // 通用错误类型模板

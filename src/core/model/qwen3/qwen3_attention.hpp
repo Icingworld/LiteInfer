@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <expected>
 
+#include "core/kvcache/kvcache.hpp"
 #include "core/layer/linear.hpp"
 #include "core/layer/rms_norm.hpp"
 #include "core/model/model_error.hpp"
@@ -12,7 +13,7 @@ namespace liteinfer::core::model::qwen3
 {
 
 // Qwen3 分组查询自注意力
-// 当前版本只支持不带 KVCache 的 Float32 causal attention
+// 当前版本使用 Float32 causal attention，并支持连续静态 KV cache。
 class Qwen3Attention
 {
 private:
@@ -50,6 +51,17 @@ public:
     [[nodiscard]]
     std::expected<tensor::Tensor, ModelError> forward(const tensor::Tensor & input) const;
 
+    // 使用指定 layer 的 KV cache 前向传播。
+    // input: [sequence_length, hidden_size] 或 [1, sequence_length, hidden_size]
+    // region: 当前 forward 预留的 cache 区间，范围为 [start, end)
+    [[nodiscard]]
+    std::expected<tensor::Tensor, ModelError> forward(
+        const tensor::Tensor & input,
+        kvcache::KVCache & cache,
+        std::size_t layer_index,
+        const kvcache::KVCacheRegion & region
+    ) const;
+
     // 获取隐藏层大小
     [[nodiscard]]
     std::size_t hidden_size() const noexcept;
@@ -71,6 +83,14 @@ public:
     float rope_theta() const noexcept;
 
 private:
+    [[nodiscard]]
+    std::expected<tensor::Tensor, ModelError> forward_impl(
+        const tensor::Tensor & input,
+        kvcache::KVCache * cache,
+        std::size_t layer_index,
+        const kvcache::KVCacheRegion * region
+    ) const;
+
     layer::Linear q_proj_;
     layer::Linear k_proj_;
     layer::Linear v_proj_;
