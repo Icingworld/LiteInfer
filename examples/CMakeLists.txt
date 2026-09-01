@@ -24,3 +24,10 @@ target_link_libraries(liteinfer_qwen3_text_generation
     PRIVATE
         liteinfer_core_runtime_qwen3
 )
+
+if(WIN32 AND CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
+    target_link_options(liteinfer_qwen3_text_generation
+        PRIVATE
+            -municode
+    )
+endif()

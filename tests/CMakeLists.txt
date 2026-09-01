@@ -1,3 +1,11 @@
+# Tests use assert as the repository's minimal test framework. Keep those
+# checks enabled when the production targets are built in Release mode.
+if(CMAKE_CXX_COMPILER_ID MATCHES "GNU|Clang")
+    add_compile_options(-UNDEBUG)
+elseif(MSVC)
+    add_compile_options(/UNDEBUG)
+endif()
+
 add_executable(liteinfer_tensor_test
     tensor_test.cpp
 )
