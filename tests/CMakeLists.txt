@@ -154,3 +154,14 @@ target_link_libraries(liteinfer_qwen3_tokenizer_test
 )
 
 add_test(NAME liteinfer_qwen3_tokenizer_test COMMAND liteinfer_qwen3_tokenizer_test)
+
+add_executable(liteinfer_qwen3_text_generator_test
+    qwen3_text_generator_test.cpp
+)
+
+target_link_libraries(liteinfer_qwen3_text_generator_test
+    PRIVATE
+        liteinfer_core_runtime_qwen3
+)
+
+add_test(NAME liteinfer_qwen3_text_generator_test COMMAND liteinfer_qwen3_text_generator_test)
