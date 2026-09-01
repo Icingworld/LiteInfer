@@ -79,7 +79,8 @@ parse_positive_float(const json::Document & value, std::string_view field)
 
     const double parsed_value = value.get<double>();
     const float converted_value = static_cast<float>(parsed_value);
-    if (!std::isfinite(parsed_value) || !std::isfinite(converted_value) || converted_value <= 0.0F) [[unlikely]] {
+    if (!std::isfinite(parsed_value) || !std::isfinite(converted_value) || converted_value <= 0.0F)
+        [[unlikely]] {
         return std::unexpected(invalid_field(field, "must be a finite positive number"));
     }
 
@@ -200,9 +201,9 @@ std::expected<void, ModelError> validate_optional_runtime_features(const json::D
         if (!dtype) [[unlikely]] {
             return std::unexpected(std::move(dtype).error());
         }
-        if (*dtype != "float32") [[unlikely]] {
+        if (*dtype != "float32" && *dtype != "bfloat16") [[unlikely]] {
             return std::unexpected(
-                invalid_field("dtype", "must be 'float32' in the current runtime")
+                invalid_field("dtype", "must be 'float32' or 'bfloat16' in the current runtime")
             );
         }
     }

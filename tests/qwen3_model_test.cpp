@@ -77,6 +77,13 @@ void append_u32_le(std::vector<std::byte> & output, std::uint32_t value)
     }
 }
 
+void append_u16_le(std::vector<std::byte> & output, std::uint16_t value)
+{
+    for (std::size_t shift = 0; shift < 16; shift += 8) {
+        append_byte(output, static_cast<unsigned char>((value >> shift) & 0xffU));
+    }
+}
+
 void append_u64_le(std::vector<std::byte> & output, std::uint64_t value)
 {
     for (std::size_t shift = 0; shift < 64; shift += 8) {
@@ -87,6 +94,12 @@ void append_u64_le(std::vector<std::byte> & output, std::uint64_t value)
 void append_float_le(std::vector<std::byte> & output, float value)
 {
     append_u32_le(output, std::bit_cast<std::uint32_t>(value));
+}
+
+void append_bfloat16_le(std::vector<std::byte> & output, float value)
+{
+    const auto float32_bits = std::bit_cast<std::uint32_t>(value);
+    append_u16_le(output, static_cast<std::uint16_t>(float32_bits >> 16U));
 }
 
 json::Document make_config()
@@ -118,7 +131,7 @@ json::Document make_config()
     );
 }
 
-std::vector<TensorSpec> make_tensors()
+std::vector<TensorSpec> make_tensors(bool use_bfloat16 = false)
 {
     std::vector<TensorSpec> tensors;
     tensors.push_back(
@@ -159,28 +172,39 @@ std::vector<TensorSpec> make_tensors()
     tensors.push_back(
         TensorSpec {"model.layers.0.post_attention_layernorm.weight", {4}, {1.0F, 1.0F, 1.0F, 1.0F}}
     );
-    tensors.push_back(TensorSpec {"model.norm.weight", {4}, {1.0F, 1.0F, 1.0F, 1.0F}});
+    tensors.push_back(
+        TensorSpec {"model.norm.weight", {4}, {use_bfloat16 ? 1.5F : 1.0F, 1.0F, 1.0F, 1.0F}}
+    );
     return tensors;
 }
 
-void write_safetensors(const std::filesystem::path & path, const std::vector<TensorSpec> & tensors)
+void write_safetensors(
+    const std::filesystem::path & path,
+    const std::vector<TensorSpec> & tensors,
+    bool use_bfloat16 = false
+)
 {
     json::Document header = json::Document::object();
     std::vector<std::byte> data;
     std::uint64_t data_offset = 0;
 
     for (const auto & tensor : tensors) {
+        const std::size_t element_size = use_bfloat16 ? sizeof(std::uint16_t) : sizeof(float);
         const std::uint64_t tensor_bytes =
-            static_cast<std::uint64_t>(tensor.values.size() * sizeof(float));
+            static_cast<std::uint64_t>(tensor.values.size() * element_size);
 
         json::Document descriptor;
-        descriptor["dtype"] = "F32";
+        descriptor["dtype"] = use_bfloat16 ? "BF16" : "F32";
         descriptor["shape"] = tensor.shape;
         descriptor["data_offsets"] = {data_offset, data_offset + tensor_bytes};
         header[tensor.name] = std::move(descriptor);
 
         for (const auto value : tensor.values) {
-            append_float_le(data, value);
+            if (use_bfloat16) {
+                append_bfloat16_le(data, value);
+            } else {
+                append_float_le(data, value);
+            }
         }
         data_offset += tensor_bytes;
     }
@@ -206,7 +230,7 @@ void write_safetensors(const std::filesystem::path & path, const std::vector<Ten
 class TemporaryModel
 {
 public:
-    TemporaryModel()
+    explicit TemporaryModel(bool use_bfloat16 = false)
         : directory_(
               std::filesystem::temp_directory_path() /
               ("liteinfer_qwen3_model_test_" +
@@ -225,10 +249,18 @@ public:
 
         std::ofstream config_stream(directory_ / "config.json");
         assert(config_stream.is_open());
-        config_stream << make_config().dump();
+        auto config = make_config();
+        if (use_bfloat16) {
+            config["dtype"] = "bfloat16";
+        }
+        config_stream << config.dump();
         assert(config_stream.good());
 
-        write_safetensors(directory_ / "model.safetensors", make_tensors());
+        write_safetensors(
+            directory_ / "model.safetensors",
+            make_tensors(use_bfloat16),
+            use_bfloat16
+        );
     }
 
     TemporaryModel(const TemporaryModel &) = delete;
@@ -328,6 +360,28 @@ void test_load_and_forward()
     assert_shape(*batch_output, {1, 2, 4});
 }
 
+void test_bfloat16_weights_are_converted_to_float32()
+{
+    TemporaryModel fixture(true);
+    auto filesystem = make_filesystem();
+
+    auto model_result = Qwen3Model::load(filesystem, fixture.directory());
+    assert(model_result.has_value());
+
+    auto output = model_result->forward(make_token_ids({0, 1}));
+    assert(output.has_value());
+    assert(output->data_type() == tensor::DataType::Float32);
+    assert_shape(*output, {2, 4});
+
+    auto values = output->data_as<float>();
+    assert(values.has_value());
+    const float expected = 1.5F / std::sqrt(0.25F + 1.0e-6F);
+    assert_near((*values)[0], expected);
+    assert_near((*values)[1], 0.0F);
+    assert_near((*values)[2], 0.0F);
+    assert_near((*values)[3], 0.0F);
+}
+
 void test_forward_validation()
 {
     TemporaryModel fixture;
@@ -397,6 +451,7 @@ void test_missing_weights()
 int main()
 {
     test_load_and_forward();
+    test_bfloat16_weights_are_converted_to_float32();
     test_forward_validation();
     test_greedy_generation();
     test_missing_weights();

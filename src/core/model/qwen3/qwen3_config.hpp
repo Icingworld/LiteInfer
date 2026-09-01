@@ -12,7 +12,7 @@ namespace liteinfer::core::model::qwen3
 
 // Qwen3 模型架构配置
 // Qwen3Config 只负责读取并校验 config.json，不持有模型权重，也不创建网络层
-// 当前版本的运行时只支持 Float32、SiLU、default RoPE 和 full attention
+// 当前版本的运行时使用 Float32 计算，支持 Float32/BF16 权重、SiLU、default RoPE 和 full attention
 class Qwen3Config final
 {
 private:

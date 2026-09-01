@@ -156,6 +156,15 @@ void test_valid_document()
     assert_tiny_config(*result);
 }
 
+void test_supported_weight_dtypes()
+{
+    auto document = make_valid_document();
+    document["dtype"] = "bfloat16";
+
+    auto result = Qwen3Config::from_json(document);
+    assert(result.has_value());
+}
+
 void test_optional_fields_and_legacy_rope_theta()
 {
     auto document = make_valid_document();
@@ -199,7 +208,7 @@ void test_invalid_documents()
     }
     {
         auto document = make_valid_document();
-        document["dtype"] = "bfloat16";
+        document["dtype"] = "float16";
         assert_invalid_config(document);
     }
     {
@@ -269,6 +278,7 @@ void test_file_errors()
 int main()
 {
     test_valid_document();
+    test_supported_weight_dtypes();
     test_optional_fields_and_legacy_rope_theta();
     test_invalid_documents();
     test_load_from_file();

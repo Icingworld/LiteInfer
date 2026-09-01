@@ -1,10 +1,16 @@
 #include "core/model/qwen3/qwen3_model.hpp"
 
+#include <bit>
+#include <cstddef>
+#include <cstdint>
+#include <cstring>
 #include <limits>
 #include <optional>
+#include <span>
 #include <string>
 #include <string_view>
 #include <utility>
+#include <vector>
 
 #include "core/safetensors/safetensors_file.hpp"
 
@@ -33,7 +39,35 @@ ModelError invalid_tensor(std::string_view name, std::string_view reason)
     return invalid_configuration(message);
 }
 
-std::expected<tensor::Tensor, ModelError> load_f32_tensor(
+std::expected<std::vector<std::byte>, ModelError> convert_bfloat16_to_float32(
+    std::span<const std::byte> bytes,
+    std::size_t numel,
+    std::string_view name
+)
+{
+    if (numel > std::numeric_limits<std::size_t>::max() / sizeof(std::uint16_t) ||
+        bytes.size() != numel * sizeof(std::uint16_t)) [[unlikely]] {
+        return std::unexpected(invalid_tensor(name, "has an invalid BF16 byte size"));
+    }
+    if (numel > std::numeric_limits<std::size_t>::max() / sizeof(float)) [[unlikely]] {
+        return std::unexpected(invalid_tensor(name, "is too large to convert to Float32"));
+    }
+
+    std::vector<std::byte> converted(numel * sizeof(float));
+    for (std::size_t index = 0; index < numel; ++index) {
+        const std::size_t byte_offset = index * sizeof(std::uint16_t);
+        const auto low = std::to_integer<std::uint8_t>(bytes[byte_offset]);
+        const auto high = std::to_integer<std::uint8_t>(bytes[byte_offset + 1]);
+        const auto bfloat16_bits =
+            static_cast<std::uint16_t>(low) | (static_cast<std::uint16_t>(high) << 8U);
+        const auto float32_bits = static_cast<std::uint32_t>(bfloat16_bits) << 16U;
+        const float value = std::bit_cast<float>(float32_bits);
+        std::memcpy(converted.data() + index * sizeof(float), &value, sizeof(value));
+    }
+    return converted;
+}
+
+std::expected<tensor::Tensor, ModelError> load_float32_tensor(
     safetensors::SafetensorsFile & weights,
     std::string_view name,
     const std::vector<std::size_t> & expected_shape
@@ -44,8 +78,8 @@ std::expected<tensor::Tensor, ModelError> load_f32_tensor(
         return std::unexpected(std::move(descriptor).error());
     }
 
-    if (descriptor->dtype != "F32") [[unlikely]] {
-        return std::unexpected(invalid_tensor(name, "must use F32 dtype"));
+    if (descriptor->dtype != "F32" && descriptor->dtype != "BF16") [[unlikely]] {
+        return std::unexpected(invalid_tensor(name, "must use F32 or BF16 dtype"));
     }
 
     if (descriptor->shape.size() != expected_shape.size()) [[unlikely]] {
@@ -60,16 +94,30 @@ std::expected<tensor::Tensor, ModelError> load_f32_tensor(
         }
     }
 
+    auto shape = tensor::Shape(expected_shape);
+    auto numel = shape.numel();
+    if (!numel) [[unlikely]] {
+        return std::unexpected(std::move(numel).error());
+    }
+
     auto bytes = weights.read_tensor(name);
     if (!bytes) [[unlikely]] {
         return std::unexpected(std::move(bytes).error());
     }
 
-    auto result = tensor::Tensor::from_bytes(
-        tensor::DataType::Float32,
-        tensor::Shape(expected_shape),
-        *bytes
-    );
+    std::vector<std::byte> converted;
+    std::span<const std::byte> float32_bytes = *bytes;
+    if (descriptor->dtype == "BF16") {
+        auto conversion = convert_bfloat16_to_float32(*bytes, *numel, name);
+        if (!conversion) [[unlikely]] {
+            return std::unexpected(std::move(conversion).error());
+        }
+        converted = std::move(*conversion);
+        float32_bytes = converted;
+    }
+
+    auto result =
+        tensor::Tensor::from_bytes(tensor::DataType::Float32, std::move(shape), float32_bytes);
     if (!result) [[unlikely]] {
         return std::unexpected(std::move(result).error());
     }
@@ -84,14 +132,14 @@ std::expected<layer::Linear, ModelError> load_linear(
     const std::vector<std::size_t> & bias_shape
 )
 {
-    auto weight = load_f32_tensor(weights, weight_name, weight_shape);
+    auto weight = load_float32_tensor(weights, weight_name, weight_shape);
     if (!weight) [[unlikely]] {
         return std::unexpected(std::move(weight).error());
     }
 
     std::optional<tensor::Tensor> bias;
     if (bias_name != nullptr) {
-        auto bias_tensor = load_f32_tensor(weights, *bias_name, bias_shape);
+        auto bias_tensor = load_float32_tensor(weights, *bias_name, bias_shape);
         if (!bias_tensor) [[unlikely]] {
             return std::unexpected(std::move(bias_tensor).error());
         }
@@ -112,7 +160,7 @@ std::expected<layer::RMSNorm, ModelError> load_rms_norm(
     float eps
 )
 {
-    auto weight = load_f32_tensor(weights, weight_name, {normalized_size});
+    auto weight = load_float32_tensor(weights, weight_name, {normalized_size});
     if (!weight) [[unlikely]] {
         return std::unexpected(std::move(weight).error());
     }
@@ -159,7 +207,7 @@ Qwen3Model::load(filesystem::Filesystem & filesystem, const std::filesystem::pat
     const std::size_t query_width = config.num_attention_heads() * config.head_dim();
     const std::size_t key_value_width = config.num_key_value_heads() * config.head_dim();
 
-    auto embedding_weight = load_f32_tensor(
+    auto embedding_weight = load_float32_tensor(
         weights,
         "model.embed_tokens.weight",
         {config.vocab_size(), config.hidden_size()}
