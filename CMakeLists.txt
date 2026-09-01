@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 4.2.3)
-project(liteinfer VERSION 0.1.0 LANGUAGES CXX)
+project(liteinfer VERSION 0.1.1 LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -11,6 +11,7 @@ set(CMAKE_CXX_SCAN_FOR_MODULES OFF)
 enable_testing()
 
 add_subdirectory(src/core/tensor)
+add_subdirectory(src/core/kvcache)
 add_subdirectory(src/core/embedding)
 add_subdirectory(src/core/kernels)
 add_subdirectory(src/core/layer)

@@ -17,6 +17,7 @@ enum class TensorErrorCode : std::uint8_t
     DataTypeMismatch = 4,
     NonContiguous = 5,
     InvalidDataAlignment = 6,
+    ShapeMismatch = 7,
 };
 
 // Tensor 错误

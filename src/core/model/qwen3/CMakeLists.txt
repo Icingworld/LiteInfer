@@ -18,6 +18,7 @@ target_link_libraries(liteinfer_core_model_qwen3
     PUBLIC
         liteinfer_core_embedding
         liteinfer_core_filesystem
+        liteinfer_core_kvcache
         liteinfer_core_layer
         liteinfer_core_json
         liteinfer_core_safetensors

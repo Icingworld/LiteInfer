@@ -20,7 +20,8 @@ add_residual(const tensor::Tensor & residual, const tensor::Tensor & branch_outp
     if (residual.data_type() != tensor::DataType::Float32 ||
         branch_output.data_type() != tensor::DataType::Float32 ||
         residual_shape.size() != branch_shape.size() ||
-        !std::equal(residual_shape.begin(), residual_shape.end(), branch_shape.begin())) [[unlikely]] {
+        !std::equal(residual_shape.begin(), residual_shape.end(), branch_shape.begin()))
+        [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidConfiguration,
             "Qwen3 DecoderLayer residual tensors must have matching Float32 shapes"
@@ -107,6 +108,26 @@ std::expected<tensor::Tensor, ModelError> Qwen3DecoderLayer::forward(
     const tensor::Tensor & input
 ) const
 {
+    return forward_impl(input, nullptr, 0, nullptr);
+}
+
+std::expected<tensor::Tensor, ModelError> Qwen3DecoderLayer::forward(
+    const tensor::Tensor & input,
+    kvcache::KVCache & cache,
+    std::size_t layer_index,
+    const kvcache::KVCacheRegion & region
+) const
+{
+    return forward_impl(input, &cache, layer_index, &region);
+}
+
+std::expected<tensor::Tensor, ModelError> Qwen3DecoderLayer::forward_impl(
+    const tensor::Tensor & input,
+    kvcache::KVCache * cache,
+    std::size_t layer_index,
+    const kvcache::KVCacheRegion * region
+) const
+{
     if (input.rank() < 2) [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidInput,
@@ -119,7 +140,9 @@ std::expected<tensor::Tensor, ModelError> Qwen3DecoderLayer::forward(
         return std::unexpected(std::move(attention_input).error());
     }
 
-    auto attention_output = self_attn_.forward(*attention_input);
+    auto attention_output =
+        cache == nullptr ? self_attn_.forward(*attention_input)
+                         : self_attn_.forward(*attention_input, *cache, layer_index, *region);
     if (!attention_output) [[unlikely]] {
         return std::unexpected(std::move(attention_output).error());
     }

@@ -45,21 +45,20 @@ std::expected<tensor::Tensor, ModelError> make_input_tensor(
     return std::move(*input);
 }
 
-std::expected<common::TokenId, ModelError> select_greedy_token(
-    const tensor::Tensor & logits,
-    std::size_t sequence_length,
-    std::size_t vocab_size
-)
+std::expected<common::TokenId, ModelError>
+select_greedy_token(const tensor::Tensor & logits, std::size_t vocab_size)
 {
-    if (sequence_length == 0 || vocab_size == 0) [[unlikely]] {
+    if (vocab_size == 0) [[unlikely]] {
         return std::unexpected(
             invalid_configuration("Qwen3Model returned an empty logits dimension")
         );
     }
 
     const auto shape = logits.shape().values();
-    if (shape.size() != 3 || shape[0] != 1 || shape[1] != sequence_length || shape[2] != vocab_size)
-        [[unlikely]] {
+    const bool expected_shape =
+        (shape.size() == 2 && shape[0] == 1 && shape[1] == vocab_size) ||
+        (shape.size() == 3 && shape[0] == 1 && shape[1] == 1 && shape[2] == vocab_size);
+    if (!expected_shape) [[unlikely]] {
         return std::unexpected(
             invalid_configuration("Qwen3Model returned an unexpected logits shape")
         );
@@ -71,12 +70,7 @@ std::expected<common::TokenId, ModelError> select_greedy_token(
         );
     }
 
-    if (sequence_length > std::numeric_limits<std::size_t>::max() / vocab_size) [[unlikely]] {
-        return std::unexpected(invalid_configuration("Qwen3Model logits size overflows size_t"));
-    }
-
-    const std::size_t expected_numel = sequence_length * vocab_size;
-    if (logits.numel() != expected_numel) [[unlikely]] {
+    if (logits.numel() != vocab_size) [[unlikely]] {
         return std::unexpected(
             invalid_configuration("Qwen3Model returned inconsistent logits storage")
         );
@@ -87,8 +81,7 @@ std::expected<common::TokenId, ModelError> select_greedy_token(
         return std::unexpected(std::move(values).error());
     }
 
-    const std::size_t last_offset = (sequence_length - 1) * vocab_size;
-    const auto last_logits = values->subspan(last_offset, vocab_size);
+    const auto last_logits = values->subspan(0, vocab_size);
 
     for (const float score : last_logits) {
         if (!std::isfinite(score)) [[unlikely]] {
@@ -160,18 +153,27 @@ std::expected<std::vector<common::TokenId>, ModelError> Qwen3Generator::generate
     std::vector<common::TokenId> tokens(prompt.begin(), prompt.end());
     tokens.reserve(tokens.size() + max_new_tokens);
 
+    if (max_new_tokens == 0) {
+        return tokens;
+    }
+
+    auto cache = model_->create_kv_cache();
+    if (!cache) [[unlikely]] {
+        return std::unexpected(std::move(cache).error());
+    }
+
+    auto prompt_input = make_input_tensor(tokens);
+    if (!prompt_input) [[unlikely]] {
+        return std::unexpected(std::move(prompt_input).error());
+    }
+
+    auto logits = model_->prefill(*prompt_input, *cache);
+    if (!logits) [[unlikely]] {
+        return std::unexpected(std::move(logits).error());
+    }
+
     for (std::size_t step = 0; step < max_new_tokens; ++step) {
-        auto input = make_input_tensor(tokens);
-        if (!input) [[unlikely]] {
-            return std::unexpected(std::move(input).error());
-        }
-
-        auto logits = model_->forward(*input);
-        if (!logits) [[unlikely]] {
-            return std::unexpected(std::move(logits).error());
-        }
-
-        auto next_token = select_greedy_token(*logits, tokens.size(), vocab_size);
+        auto next_token = select_greedy_token(*logits, vocab_size);
         if (!next_token) [[unlikely]] {
             return std::unexpected(std::move(next_token).error());
         }
@@ -179,6 +181,20 @@ std::expected<std::vector<common::TokenId>, ModelError> Qwen3Generator::generate
         tokens.push_back(*next_token);
         if (eos_token_id.has_value() && *next_token == *eos_token_id) {
             break;
+        }
+
+        if (step + 1 == max_new_tokens) {
+            break;
+        }
+
+        auto decode_input = make_input_tensor(std::vector<common::TokenId> {*next_token});
+        if (!decode_input) [[unlikely]] {
+            return std::unexpected(std::move(decode_input).error());
+        }
+
+        logits = model_->decode(*decode_input, *cache);
+        if (!logits) [[unlikely]] {
+            return std::unexpected(std::move(logits).error());
         }
     }
 

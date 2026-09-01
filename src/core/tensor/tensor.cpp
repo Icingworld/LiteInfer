@@ -1,6 +1,11 @@
 #include "core/tensor/tensor.hpp"
 
+#include <algorithm>
+#include <cstring>
 #include <limits>
+#include <memory>
+#include <stdexcept>
+#include <string>
 #include <utility>
 
 namespace liteinfer::core::tensor
@@ -71,7 +76,8 @@ compute_layout(DataType data_type, const Shape & shape) noexcept
 
     const std::size_t count = *numel;
     const std::size_t element_bytes = *element_size_result;
-    if (count != 0 && element_bytes > std::numeric_limits<std::size_t>::max() / count) [[unlikely]] {
+    if (count != 0 && element_bytes > std::numeric_limits<std::size_t>::max() / count)
+        [[unlikely]] {
         return std::unexpected(TensorError(TensorErrorCode::Overflow, "Tensor byte size overflow"));
     }
 
@@ -82,23 +88,121 @@ compute_layout(DataType data_type, const Shape & shape) noexcept
     };
 }
 
+[[nodiscard]]
+Strides contiguous_strides_or_throw(const Shape & shape)
+{
+    auto result = Strides::from_shape(shape);
+    if (!result) [[unlikely]] {
+        throw std::invalid_argument(std::string(result.error().message()));
+    }
+    return std::move(*result);
+}
+
+[[nodiscard]]
+std::expected<std::size_t, TensorError> compute_storage_span_bytes(
+    const Shape & shape,
+    const Strides & strides,
+    std::size_t element_size
+) noexcept
+{
+    const auto dimensions = shape.values();
+    const auto stride_values = strides.values();
+    if (dimensions.size() != stride_values.size()) [[unlikely]] {
+        return std::unexpected(
+            TensorError(TensorErrorCode::ShapeMismatch, "Tensor shape and strides rank mismatch")
+        );
+    }
+
+    for (const auto dimension : dimensions) {
+        if (dimension == 0) {
+            return std::size_t {0};
+        }
+    }
+
+    std::size_t maximum_element_offset = 0;
+    for (std::size_t index = 0; index < dimensions.size(); ++index) {
+        const std::size_t extent = dimensions[index] - 1;
+        if (extent != 0 && stride_values[index] > std::numeric_limits<std::size_t>::max() / extent)
+            [[unlikely]] {
+            return std::unexpected(
+                TensorError(TensorErrorCode::Overflow, "Tensor view offset overflow")
+            );
+        }
+
+        const std::size_t dimension_offset = extent * stride_values[index];
+        if (maximum_element_offset > std::numeric_limits<std::size_t>::max() - dimension_offset)
+            [[unlikely]] {
+            return std::unexpected(
+                TensorError(TensorErrorCode::Overflow, "Tensor view offset overflow")
+            );
+        }
+        maximum_element_offset += dimension_offset;
+    }
+
+    if (maximum_element_offset == std::numeric_limits<std::size_t>::max()) [[unlikely]] {
+        return std::unexpected(
+            TensorError(TensorErrorCode::Overflow, "Tensor view byte span overflow")
+        );
+    }
+    const std::size_t element_span = maximum_element_offset + 1;
+    if (element_size == 0 || element_span > std::numeric_limits<std::size_t>::max() / element_size)
+        [[unlikely]] {
+        return std::unexpected(
+            TensorError(TensorErrorCode::Overflow, "Tensor view byte span overflow")
+        );
+    }
+
+    return element_span * element_size;
+}
+
 } // namespace
 
 Tensor::Tensor(
     DataType data_type,
     Shape shape,
     Strides strides,
-    std::vector<std::byte> data,
+    std::shared_ptr<std::vector<std::byte>> storage,
+    std::size_t data_offset_bytes,
+    std::size_t data_span_bytes,
     std::size_t numel,
     std::size_t element_size
 )
     : data_type_(data_type)
     , shape_(std::move(shape))
     , strides_(std::move(strides))
-    , data_(std::move(data))
+    , storage_(std::move(storage))
+    , data_offset_bytes_(data_offset_bytes)
+    , data_span_bytes_(data_span_bytes)
     , numel_(numel)
     , element_size_(element_size)
 {}
+
+Tensor::Tensor(const Tensor & other)
+    : data_type_(other.data_type_)
+    , shape_(other.shape_)
+    , strides_(contiguous_strides_or_throw(other.shape_))
+    , storage_(std::make_shared<std::vector<std::byte>>(other.bytes(), std::byte {0}))
+    , data_offset_bytes_(0)
+    , data_span_bytes_(other.bytes())
+    , numel_(other.numel_)
+    , element_size_(other.element_size_)
+{
+    auto result = copy_from(other);
+    if (!result) [[unlikely]] {
+        throw std::invalid_argument(std::string(result.error().message()));
+    }
+}
+
+Tensor & Tensor::operator=(const Tensor & other)
+{
+    if (this == &other) {
+        return *this;
+    }
+
+    Tensor copy(other);
+    *this = std::move(copy);
+    return *this;
+}
 
 std::expected<Tensor, TensorError> Tensor::allocate(DataType data_type, Shape shape)
 {
@@ -107,18 +211,19 @@ std::expected<Tensor, TensorError> Tensor::allocate(DataType data_type, Shape sh
         return std::unexpected(std::move(layout).error());
     }
 
-    std::vector<std::byte> data(layout->bytes, std::byte {0});
-
     auto strides = Strides::from_shape(shape);
     if (!strides) [[unlikely]] {
         return std::unexpected(std::move(strides).error());
     }
 
+    auto storage = std::make_shared<std::vector<std::byte>>(layout->bytes, std::byte {0});
     return Tensor(
         data_type,
         std::move(shape),
         *std::move(strides),
-        std::move(data),
+        std::move(storage),
+        0,
+        layout->bytes,
         layout->numel,
         layout->element_size
     );
@@ -138,21 +243,154 @@ Tensor::from_bytes(DataType data_type, Shape shape, std::span<const std::byte> b
         );
     }
 
-    std::vector<std::byte> data(bytes.begin(), bytes.end());
-
     auto strides = Strides::from_shape(shape);
     if (!strides) [[unlikely]] {
         return std::unexpected(std::move(strides).error());
     }
 
+    auto storage = std::make_shared<std::vector<std::byte>>(bytes.begin(), bytes.end());
     return Tensor(
         data_type,
         std::move(shape),
         *std::move(strides),
-        std::move(data),
+        std::move(storage),
+        0,
+        layout->bytes,
         layout->numel,
         layout->element_size
     );
+}
+
+std::expected<Tensor, TensorError>
+Tensor::narrow(std::size_t dimension, std::size_t start, std::size_t length) const
+{
+    const auto dimensions = shape_.values();
+    if (dimension >= dimensions.size()) [[unlikely]] {
+        return std::unexpected(
+            TensorError(TensorErrorCode::IndexOutOfRange, "Tensor dimension out of range")
+        );
+    }
+
+    if (start > dimensions[dimension] || length > dimensions[dimension] - start) [[unlikely]] {
+        return std::unexpected(
+            TensorError(TensorErrorCode::IndexOutOfRange, "Tensor narrow range out of range")
+        );
+    }
+
+    auto narrowed_dimensions = std::vector<std::size_t>(dimensions.begin(), dimensions.end());
+    narrowed_dimensions[dimension] = length;
+    Shape narrowed_shape(std::move(narrowed_dimensions));
+    auto narrowed_numel = narrowed_shape.numel();
+    if (!narrowed_numel) [[unlikely]] {
+        return std::unexpected(std::move(narrowed_numel).error());
+    }
+
+    const auto stride_values = strides_.values();
+    if (stride_values.size() != dimensions.size() || element_size_ == 0) [[unlikely]] {
+        return std::unexpected(
+            TensorError(TensorErrorCode::ShapeMismatch, "Tensor layout is not initialized")
+        );
+    }
+    if (start != 0 && stride_values[dimension] > std::numeric_limits<std::size_t>::max() / start)
+        [[unlikely]] {
+        return std::unexpected(
+            TensorError(TensorErrorCode::Overflow, "Tensor narrow offset overflow")
+        );
+    }
+    const std::size_t offset_elements = start * stride_values[dimension];
+    if (offset_elements > std::numeric_limits<std::size_t>::max() / element_size_) [[unlikely]] {
+        return std::unexpected(
+            TensorError(TensorErrorCode::Overflow, "Tensor narrow byte offset overflow")
+        );
+    }
+    const std::size_t offset_element_bytes = offset_elements * element_size_;
+    if (data_offset_bytes_ > std::numeric_limits<std::size_t>::max() - offset_element_bytes)
+        [[unlikely]] {
+        return std::unexpected(
+            TensorError(TensorErrorCode::Overflow, "Tensor narrow byte offset overflow")
+        );
+    }
+    const std::size_t offset_bytes = data_offset_bytes_ + offset_element_bytes;
+
+    auto data_span = compute_storage_span_bytes(narrowed_shape, strides_, element_size_);
+    if (!data_span) [[unlikely]] {
+        return std::unexpected(std::move(data_span).error());
+    }
+    if (!storage_ || offset_bytes > storage_->size() ||
+        *data_span > storage_->size() - offset_bytes) [[unlikely]] {
+        return std::unexpected(
+            TensorError(TensorErrorCode::IndexOutOfRange, "Tensor narrow range exceeds storage")
+        );
+    }
+
+    return Tensor(
+        data_type_,
+        std::move(narrowed_shape),
+        strides_,
+        storage_,
+        offset_bytes,
+        *data_span,
+        *narrowed_numel,
+        element_size_
+    );
+}
+
+std::expected<void, TensorError> Tensor::copy_from(const Tensor & source)
+{
+    if (data_type_ != source.data_type_) [[unlikely]] {
+        return std::unexpected(
+            TensorError(TensorErrorCode::DataTypeMismatch, "Tensor data type mismatch")
+        );
+    }
+
+    const auto destination_shape = shape_.values();
+    const auto source_shape = source.shape_.values();
+    if (destination_shape.size() != source_shape.size() ||
+        !std::equal(destination_shape.begin(), destination_shape.end(), source_shape.begin()))
+        [[unlikely]] {
+        return std::unexpected(
+            TensorError(TensorErrorCode::ShapeMismatch, "Tensor shapes do not match")
+        );
+    }
+
+    if (numel_ == 0) {
+        return {};
+    }
+
+    if (!storage_ || !source.storage_) [[unlikely]] {
+        return std::unexpected(
+            TensorError(TensorErrorCode::InvalidByteSize, "Tensor storage is not initialized")
+        );
+    }
+
+    if (is_contiguous() && source.is_contiguous()) {
+        std::memmove(data().data(), source.data().data(), bytes());
+        return {};
+    }
+
+    if (storage_ == source.storage_) {
+        std::vector<std::byte> temporary(bytes());
+        for (std::size_t index = 0; index < numel_; ++index) {
+            std::memcpy(
+                temporary.data() + index * element_size_,
+                source.element_pointer(index),
+                element_size_
+            );
+        }
+        for (std::size_t index = 0; index < numel_; ++index) {
+            std::memcpy(
+                element_pointer(index),
+                temporary.data() + index * element_size_,
+                element_size_
+            );
+        }
+        return {};
+    }
+
+    for (std::size_t index = 0; index < numel_; ++index) {
+        std::memcpy(element_pointer(index), source.element_pointer(index), element_size_);
+    }
+    return {};
 }
 
 DataType Tensor::data_type() const noexcept
@@ -187,7 +425,7 @@ std::size_t Tensor::element_size() const noexcept
 
 std::size_t Tensor::bytes() const noexcept
 {
-    return data_.size();
+    return numel_ * element_size_;
 }
 
 bool Tensor::is_contiguous() const noexcept
@@ -213,17 +451,65 @@ bool Tensor::is_contiguous() const noexcept
 
 std::span<std::byte> Tensor::data() noexcept
 {
-    return data_;
+    if (!storage_ || data_offset_bytes_ > storage_->size() ||
+        data_span_bytes_ > storage_->size() - data_offset_bytes_) [[unlikely]] {
+        return {};
+    }
+
+    auto * base = storage_->data();
+    if (base == nullptr) {
+        return {};
+    }
+    return std::span<std::byte>(base + data_offset_bytes_, data_span_bytes_);
 }
 
 std::span<const std::byte> Tensor::data() const noexcept
 {
-    return data_;
+    if (!storage_ || data_offset_bytes_ > storage_->size() ||
+        data_span_bytes_ > storage_->size() - data_offset_bytes_) [[unlikely]] {
+        return {};
+    }
+
+    const auto * base = storage_->data();
+    if (base == nullptr) {
+        return {};
+    }
+    return std::span<const std::byte>(base + data_offset_bytes_, data_span_bytes_);
 }
 
 bool Tensor::empty() const noexcept
 {
     return numel_ == 0;
+}
+
+std::byte * Tensor::element_pointer(std::size_t linear_index) noexcept
+{
+    const Tensor & self = *this;
+    return const_cast<std::byte *>(self.element_pointer(linear_index));
+}
+
+const std::byte * Tensor::element_pointer(std::size_t linear_index) const noexcept
+{
+    if (linear_index >= numel_ || !storage_) [[unlikely]] {
+        return nullptr;
+    }
+
+    const auto dimensions = shape_.values();
+    const auto stride_values = strides_.values();
+    std::size_t remaining = linear_index;
+    std::size_t element_offset = 0;
+    for (std::size_t index = dimensions.size(); index > 0; --index) {
+        const std::size_t dimension = index - 1;
+        if (dimensions[dimension] == 0) [[unlikely]] {
+            return nullptr;
+        }
+
+        const std::size_t coordinate = remaining % dimensions[dimension];
+        remaining /= dimensions[dimension];
+        element_offset += coordinate * stride_values[dimension];
+    }
+
+    return storage_->data() + data_offset_bytes_ + element_offset * element_size_;
 }
 
 } // namespace liteinfer::core::tensor

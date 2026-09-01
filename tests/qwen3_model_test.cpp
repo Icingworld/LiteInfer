@@ -131,8 +131,71 @@ json::Document make_config()
     );
 }
 
-std::vector<TensorSpec> make_tensors(bool use_bfloat16 = false)
+std::vector<TensorSpec> make_tensors(bool use_bfloat16 = false, bool use_nonzero_attention = false)
 {
+    auto q_proj_weights = zeros({4, 4});
+    auto k_proj_weights = zeros({2, 4});
+    auto v_proj_weights = zeros({2, 4});
+    auto o_proj_weights = zeros({4, 4});
+    if (use_nonzero_attention) {
+        q_proj_weights = {
+            1.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            1.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            1.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            1.0F,
+        };
+        k_proj_weights = {
+            1.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            1.0F,
+            0.0F,
+            0.0F,
+        };
+        v_proj_weights = {
+            0.0F,
+            0.0F,
+            1.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            1.0F,
+        };
+        o_proj_weights = {
+            1.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            1.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            1.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            0.0F,
+            1.0F,
+        };
+    }
+
     std::vector<TensorSpec> tensors;
     tensors.push_back(
         TensorSpec {
@@ -157,10 +220,34 @@ std::vector<TensorSpec> make_tensors(bool use_bfloat16 = false)
         }
     );
 
-    tensors.push_back(TensorSpec {"model.layers.0.self_attn.q_proj.weight", {4, 4}, zeros({4, 4})});
-    tensors.push_back(TensorSpec {"model.layers.0.self_attn.k_proj.weight", {2, 4}, zeros({2, 4})});
-    tensors.push_back(TensorSpec {"model.layers.0.self_attn.v_proj.weight", {2, 4}, zeros({2, 4})});
-    tensors.push_back(TensorSpec {"model.layers.0.self_attn.o_proj.weight", {4, 4}, zeros({4, 4})});
+    tensors.push_back(
+        TensorSpec {
+            "model.layers.0.self_attn.q_proj.weight",
+            {4, 4},
+            std::move(q_proj_weights),
+        }
+    );
+    tensors.push_back(
+        TensorSpec {
+            "model.layers.0.self_attn.k_proj.weight",
+            {2, 4},
+            std::move(k_proj_weights),
+        }
+    );
+    tensors.push_back(
+        TensorSpec {
+            "model.layers.0.self_attn.v_proj.weight",
+            {2, 4},
+            std::move(v_proj_weights),
+        }
+    );
+    tensors.push_back(
+        TensorSpec {
+            "model.layers.0.self_attn.o_proj.weight",
+            {4, 4},
+            std::move(o_proj_weights),
+        }
+    );
     tensors.push_back(TensorSpec {"model.layers.0.self_attn.q_norm.weight", {2}, {1.0F, 1.0F}});
     tensors.push_back(TensorSpec {"model.layers.0.self_attn.k_norm.weight", {2}, {1.0F, 1.0F}});
     tensors.push_back(TensorSpec {"model.layers.0.mlp.gate_proj.weight", {4, 4}, zeros({4, 4})});
@@ -230,7 +317,10 @@ void write_safetensors(
 class TemporaryModel
 {
 public:
-    explicit TemporaryModel(bool use_bfloat16 = false)
+    explicit TemporaryModel(
+        bool use_bfloat16 = false,
+        bool use_nonzero_attention = false
+    )
         : directory_(
               std::filesystem::temp_directory_path() /
               ("liteinfer_qwen3_model_test_" +
@@ -258,7 +348,7 @@ public:
 
         write_safetensors(
             directory_ / "model.safetensors",
-            make_tensors(use_bfloat16),
+            make_tensors(use_bfloat16, use_nonzero_attention),
             use_bfloat16
         );
     }
@@ -316,6 +406,127 @@ void assert_shape(const tensor::Tensor & value, std::initializer_list<std::size_
 void assert_near(float actual, float expected, float tolerance = 1.0e-5F)
 {
     assert(std::fabs(actual - expected) <= tolerance);
+}
+
+void test_prefill_decode_matches_full_forward()
+{
+    TemporaryModel fixture(false, true);
+    auto filesystem = make_filesystem();
+    auto model_result = Qwen3Model::load(filesystem, fixture.directory());
+    assert(model_result.has_value());
+    auto & model = *model_result;
+
+    auto prompt = make_token_ids({0, 1});
+    auto full_prompt = model.forward(prompt);
+    assert(full_prompt.has_value());
+    assert_shape(*full_prompt, {2, 4});
+    auto full_prompt_values = full_prompt->data_as<float>();
+    assert(full_prompt_values.has_value());
+
+    auto cache_result = model.create_kv_cache();
+    assert(cache_result.has_value());
+    auto & cache = *cache_result;
+
+    auto prefill = model.prefill(prompt, cache);
+    assert(prefill.has_value());
+    assert_shape(*prefill, {1, 4});
+    assert(cache.length() == 2);
+    auto prefill_values = prefill->data_as<float>();
+    assert(prefill_values.has_value());
+    for (std::size_t index = 0; index < 4; ++index) {
+        assert_near((*prefill_values)[index], (*full_prompt_values)[4 + index]);
+    }
+
+    auto next_token = make_token_ids({2});
+    auto full_sequence = make_token_ids({0, 1, 2});
+    auto full_output = model.forward(full_sequence);
+    assert(full_output.has_value());
+    assert_shape(*full_output, {3, 4});
+    auto full_output_values = full_output->data_as<float>();
+    assert(full_output_values.has_value());
+
+    auto decoded = model.decode(next_token, cache);
+    assert(decoded.has_value());
+    assert_shape(*decoded, {1, 4});
+    assert(cache.length() == 3);
+    auto decoded_values = decoded->data_as<float>();
+    assert(decoded_values.has_value());
+    for (std::size_t index = 0; index < 4; ++index) {
+        assert_near((*decoded_values)[index], (*full_output_values)[8 + index]);
+    }
+
+    auto continuation = make_token_ids({3, 0});
+    auto extended_sequence = make_token_ids({0, 1, 2, 3, 0});
+    auto extended_output = model.forward(extended_sequence);
+    assert(extended_output.has_value());
+    assert_shape(*extended_output, {5, 4});
+    auto extended_output_values = extended_output->data_as<float>();
+    assert(extended_output_values.has_value());
+
+    auto continued_prefill = model.prefill(continuation, cache);
+    assert(continued_prefill.has_value());
+    assert_shape(*continued_prefill, {1, 4});
+    assert(cache.length() == 5);
+    auto continued_prefill_values = continued_prefill->data_as<float>();
+    assert(continued_prefill_values.has_value());
+    for (std::size_t index = 0; index < 4; ++index) {
+        assert_near((*continued_prefill_values)[index], (*extended_output_values)[16 + index]);
+    }
+
+    auto final_token = make_token_ids({1});
+    auto final_sequence = make_token_ids({0, 1, 2, 3, 0, 1});
+    auto final_output = model.forward(final_sequence);
+    assert(final_output.has_value());
+    assert_shape(*final_output, {6, 4});
+    auto final_output_values = final_output->data_as<float>();
+    assert(final_output_values.has_value());
+
+    auto final_decoded = model.decode(final_token, cache);
+    assert(final_decoded.has_value());
+    assert_shape(*final_decoded, {1, 4});
+    assert(cache.length() == 6);
+    auto final_decoded_values = final_decoded->data_as<float>();
+    assert(final_decoded_values.has_value());
+    for (std::size_t index = 0; index < 4; ++index) {
+        assert_near((*final_decoded_values)[index], (*final_output_values)[20 + index]);
+    }
+}
+
+void test_cached_validation_and_exact_capacity()
+{
+    TemporaryModel fixture;
+    auto filesystem = make_filesystem();
+    auto model_result = Qwen3Model::load(filesystem, fixture.directory());
+    assert(model_result.has_value());
+    auto & model = *model_result;
+
+    auto cache_result = model.create_kv_cache();
+    assert(cache_result.has_value());
+    auto & cache = *cache_result;
+
+    auto invalid_decode = model.decode(make_token_ids({0, 1}), cache);
+    assert(!invalid_decode.has_value());
+    assert(invalid_decode.error().category() == common::ErrorCategory::Model);
+    assert(cache.length() == 0);
+
+    auto invalid_token = model.prefill(make_token_ids({4}), cache);
+    assert(!invalid_token.has_value());
+    assert(invalid_token.error().category() == common::ErrorCategory::Embedding);
+    assert(cache.length() == 0);
+
+    auto seven_tokens = make_token_ids({0, 1, 2, 3, 0, 1, 2});
+    auto seven_result = model.prefill(seven_tokens, cache);
+    assert(seven_result.has_value());
+    assert(cache.length() == 7);
+
+    auto eighth_result = model.decode(make_token_ids({3}), cache);
+    assert(eighth_result.has_value());
+    assert(cache.length() == 8);
+
+    auto beyond_capacity = model.decode(make_token_ids({0}), cache);
+    assert(!beyond_capacity.has_value());
+    assert(beyond_capacity.error().category() == common::ErrorCategory::Model);
+    assert(cache.length() == 8);
 }
 
 void test_load_and_forward()
@@ -450,6 +661,8 @@ void test_missing_weights()
 
 int main()
 {
+    test_prefill_decode_matches_full_forward();
+    test_cached_validation_and_exact_capacity();
     test_load_and_forward();
     test_bfloat16_weights_are_converted_to_float32();
     test_forward_validation();

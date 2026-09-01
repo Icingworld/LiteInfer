@@ -17,6 +17,17 @@ target_link_libraries(liteinfer_tensor_test
 
 add_test(NAME liteinfer_tensor_test COMMAND liteinfer_tensor_test)
 
+add_executable(liteinfer_kvcache_test
+    kvcache_test.cpp
+)
+
+target_link_libraries(liteinfer_kvcache_test
+    PRIVATE
+        liteinfer_core_kvcache
+)
+
+add_test(NAME liteinfer_kvcache_test COMMAND liteinfer_kvcache_test)
+
 add_executable(liteinfer_embedding_test
     embedding_test.cpp
 )

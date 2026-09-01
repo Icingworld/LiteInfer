@@ -1,6 +1,7 @@
 #include "core/model/qwen3/qwen3_attention.hpp"
 
 #include <cmath>
+#include <cstdint>
 #include <limits>
 #include <span>
 #include <utility>
@@ -11,6 +12,48 @@
 
 namespace liteinfer::core::model::qwen3
 {
+
+namespace
+{
+
+ModelError cache_error(const kvcache::KVCacheError & error)
+{
+    return ModelError(ModelErrorCode::InvalidInput, error.message());
+}
+
+std::expected<std::span<const float>, ModelError> cache_float_storage(const tensor::Tensor & value)
+{
+    if (value.data_type() != tensor::DataType::Float32) [[unlikely]] {
+        return std::unexpected(
+            ModelError(ModelErrorCode::InvalidInput, "Qwen3 KV cache must use Float32")
+        );
+    }
+
+    const auto bytes = value.data();
+    if (bytes.size() % sizeof(float) != 0) [[unlikely]] {
+        return std::unexpected(
+            ModelError(ModelErrorCode::InvalidInput, "Qwen3 KV cache byte span is invalid")
+        );
+    }
+
+    if (bytes.empty()) {
+        return std::span<const float>();
+    }
+
+    const auto address = reinterpret_cast<std::uintptr_t>(bytes.data());
+    if (address % alignof(float) != 0) [[unlikely]] {
+        return std::unexpected(
+            ModelError(ModelErrorCode::InvalidInput, "Qwen3 KV cache data alignment is invalid")
+        );
+    }
+
+    return std::span<const float>(
+        reinterpret_cast<const float *>(bytes.data()),
+        bytes.size() / sizeof(float)
+    );
+}
+
+} // namespace
 
 Qwen3Attention::Qwen3Attention(
     layer::Linear q_proj,
@@ -127,6 +170,34 @@ std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward(
     const tensor::Tensor & input
 ) const
 {
+    return forward_impl(input, nullptr, 0, nullptr);
+}
+
+std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward(
+    const tensor::Tensor & input,
+    kvcache::KVCache & cache,
+    std::size_t layer_index,
+    const kvcache::KVCacheRegion & region
+) const
+{
+    return forward_impl(input, &cache, layer_index, &region);
+}
+
+std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward_impl(
+    const tensor::Tensor & input,
+    kvcache::KVCache * cache,
+    std::size_t layer_index,
+    const kvcache::KVCacheRegion * region
+) const
+{
+    const bool use_cache = cache != nullptr;
+    if (use_cache != (region != nullptr)) [[unlikely]] {
+        return std::unexpected(ModelError(
+            ModelErrorCode::InvalidInput,
+            "Qwen3 Attention cache and cache region must be provided together"
+        ));
+    }
+
     if (input.rank() < 2) [[unlikely]] {
         return std::unexpected(ModelError(
             ModelErrorCode::InvalidInput,
@@ -140,6 +211,12 @@ std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward(
     }
 
     if (input.empty()) [[unlikely]] {
+        if (use_cache) [[unlikely]] {
+            return std::unexpected(ModelError(
+                ModelErrorCode::InvalidInput,
+                "Qwen3 Attention cached input sequence must not be empty"
+            ));
+        }
         return o_proj_.forward(*query);
     }
 
@@ -217,8 +294,38 @@ std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward(
     const std::size_t query_width = num_attention_heads_ * head_dim_;
     const std::size_t key_value_width = num_key_value_heads_ * head_dim_;
     const std::size_t token_count = query->numel() / query_width;
+    if (sequence_length == 0 || token_count % sequence_length != 0) [[unlikely]] {
+        return std::unexpected(ModelError(
+            ModelErrorCode::InvalidInput,
+            "Qwen3 Attention input has an inconsistent sequence dimension"
+        ));
+    }
+
     const std::size_t batch_count = token_count / sequence_length;
+    const std::size_t position_offset = use_cache ? region->start : 0;
+    if (use_cache) {
+        if (input.rank() != 2 && input.rank() != 3) [[unlikely]] {
+            return std::unexpected(ModelError(
+                ModelErrorCode::InvalidInput,
+                "Qwen3 Attention cached input must be 2D or 3D"
+            ));
+        }
+        if (batch_count != 1 || cache->batch_size() != 1 || region->count != sequence_length ||
+            region->start != cache->length() || region->end > cache->capacity()) [[unlikely]] {
+            return std::unexpected(ModelError(
+                ModelErrorCode::InvalidInput,
+                "Qwen3 Attention cache region does not match the input sequence"
+            ));
+        }
+    }
+
     const std::size_t half_dim = head_dim_ / 2;
+    if (sequence_length > std::numeric_limits<std::size_t>::max() / half_dim) [[unlikely]] {
+        return std::unexpected(ModelError(
+            ModelErrorCode::InvalidInput,
+            "Qwen3 Attention RoPE workspace size overflows size_t"
+        ));
+    }
 
     std::vector<float> inverse_frequencies(half_dim);
     for (std::size_t dimension = 0; dimension < half_dim; ++dimension) {
@@ -229,15 +336,17 @@ std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward(
     std::vector<float> cosine(sequence_length * half_dim);
     std::vector<float> sine(sequence_length * half_dim);
     for (std::size_t position = 0; position < sequence_length; ++position) {
+        const std::size_t absolute_position = position_offset + position;
         for (std::size_t dimension = 0; dimension < half_dim; ++dimension) {
-            const float angle = static_cast<float>(position) * inverse_frequencies[dimension];
+            const float angle =
+                static_cast<float>(absolute_position) * inverse_frequencies[dimension];
             cosine[position * half_dim + dimension] = std::cos(angle);
             sine[position * half_dim + dimension] = std::sin(angle);
         }
     }
 
     for (std::size_t token = 0; token < token_count; ++token) {
-        const std::size_t position = token % sequence_length;
+        const std::size_t position = use_cache ? token : token % sequence_length;
         const auto position_cosine =
             std::span<const float>(cosine).subspan(position * half_dim, half_dim);
         const auto position_sine =
@@ -266,6 +375,23 @@ std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward(
         }
     }
 
+    if (use_cache) {
+        auto value_rows = tensor::Tensor::from_bytes(
+            tensor::DataType::Float32,
+            tensor::Shape {value->numel() / head_dim_, head_dim_},
+            value->data()
+        );
+        if (!value_rows) [[unlikely]] {
+            return std::unexpected(std::move(value_rows).error());
+        }
+
+        auto cache_write =
+            cache->write_token_major(layer_index, *region, *rotated_key, *value_rows);
+        if (!cache_write) [[unlikely]] {
+            return std::unexpected(cache_error(cache_write.error()));
+        }
+    }
+
     auto attention_output = tensor::Tensor::allocate(tensor::DataType::Float32, query->shape());
     if (!attention_output) [[unlikely]] {
         return std::unexpected(std::move(attention_output).error());
@@ -281,12 +407,58 @@ std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward(
         return std::unexpected(std::move(attention_output_values).error());
     }
 
+    const std::size_t key_length = use_cache ? region->end : sequence_length;
+    if (key_length > std::numeric_limits<std::size_t>::max() / head_dim_) [[unlikely]] {
+        return std::unexpected(ModelError(
+            ModelErrorCode::InvalidInput,
+            "Qwen3 Attention workspace size overflows size_t"
+        ));
+    }
+
     std::vector<float> query_head(sequence_length * head_dim_);
-    std::vector<float> key_head(sequence_length * head_dim_);
-    std::vector<float> value_head(sequence_length * head_dim_);
     std::vector<float> head_output(sequence_length * head_dim_);
-    std::vector<float> score_workspace(sequence_length);
+    std::vector<float> score_workspace(key_length);
+    std::vector<float> key_head;
+    std::vector<float> value_head;
+    if (!use_cache) {
+        key_head.resize(key_length * head_dim_);
+        value_head.resize(key_length * head_dim_);
+    }
     const std::size_t query_heads_per_key_value_head = num_attention_heads_ / num_key_value_heads_;
+
+    std::span<const float> cache_key_values;
+    std::span<const float> cache_value_values;
+    std::size_t cache_head_stride = 0;
+    if (use_cache) {
+        auto cache_view = cache->view(layer_index, region->end);
+        if (!cache_view) [[unlikely]] {
+            return std::unexpected(cache_error(cache_view.error()));
+        }
+
+        auto key_values = cache_float_storage(cache_view->key);
+        if (!key_values) [[unlikely]] {
+            return std::unexpected(std::move(key_values).error());
+        }
+        auto cached_value_values = cache_float_storage(cache_view->value);
+        if (!cached_value_values) [[unlikely]] {
+            return std::unexpected(std::move(cached_value_values).error());
+        }
+
+        const auto key_strides = cache_view->key.strides().values();
+        const auto value_strides = cache_view->value.strides().values();
+        if (key_strides.size() != 4 || value_strides.size() != 4 || key_strides[3] != 1 ||
+            value_strides[3] != 1 || key_strides[2] != head_dim_ || value_strides[2] != head_dim_ ||
+            key_strides[1] != value_strides[1]) [[unlikely]] {
+            return std::unexpected(ModelError(
+                ModelErrorCode::InvalidInput,
+                "Qwen3 KV cache layout is not compatible with attention"
+            ));
+        }
+
+        cache_key_values = *key_values;
+        cache_value_values = *cached_value_values;
+        cache_head_stride = key_strides[1];
+    }
 
     for (std::size_t batch = 0; batch < batch_count; ++batch) {
         for (std::size_t query_head_index = 0; query_head_index < num_attention_heads_;
@@ -296,26 +468,51 @@ std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward(
 
             for (std::size_t position = 0; position < sequence_length; ++position) {
                 const std::size_t token = batch * sequence_length + position;
-
                 for (std::size_t dimension = 0; dimension < head_dim_; ++dimension) {
                     query_head[position * head_dim_ + dimension] = (*rotated_query_values)
                         [(token * num_attention_heads_ + query_head_index) * head_dim_ + dimension];
-                    key_head[position * head_dim_ + dimension] = (*rotated_key_values)
-                        [(token * num_key_value_heads_ + key_value_head_index) * head_dim_ +
-                         dimension];
-                    value_head[position * head_dim_ + dimension] = (*value_values)
-                        [token * key_value_width + key_value_head_index * head_dim_ + dimension];
                 }
             }
 
+            if (!use_cache) {
+                for (std::size_t position = 0; position < sequence_length; ++position) {
+                    const std::size_t token = batch * sequence_length + position;
+                    for (std::size_t dimension = 0; dimension < head_dim_; ++dimension) {
+                        key_head[position * head_dim_ + dimension] = (*rotated_key_values)
+                            [(token * num_key_value_heads_ + key_value_head_index) * head_dim_ +
+                             dimension];
+                        value_head[position * head_dim_ + dimension] = (*value_values)
+                            [token * key_value_width + key_value_head_index * head_dim_ +
+                             dimension];
+                    }
+                }
+            }
+
+            const std::span<const float> attention_keys = [&]() {
+                if (!use_cache) {
+                    return std::span<const float>(key_head);
+                }
+
+                const std::size_t head_offset = key_value_head_index * cache_head_stride;
+                return cache_key_values.subspan(head_offset, key_length * head_dim_);
+            }();
+            const std::span<const float> attention_values = [&]() {
+                if (!use_cache) {
+                    return std::span<const float>(value_head);
+                }
+
+                const std::size_t head_offset = key_value_head_index * cache_head_stride;
+                return cache_value_values.subspan(head_offset, key_length * head_dim_);
+            }();
+
             kernels::sdpa_f32(
                 query_head,
-                key_head,
-                value_head,
+                attention_keys,
+                attention_values,
                 head_output,
                 score_workspace,
                 head_dim_,
-                0
+                position_offset
             );
 
             for (std::size_t position = 0; position < sequence_length; ++position) {
