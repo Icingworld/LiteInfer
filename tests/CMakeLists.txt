@@ -119,16 +119,16 @@ target_link_libraries(liteinfer_io_test
 
 add_test(NAME liteinfer_io_test COMMAND liteinfer_io_test)
 
-add_executable(liteinfer_safetensor_test
-    safetensor_test.cpp
+add_executable(liteinfer_safetensors_test
+    safetensors_test.cpp
 )
 
-target_link_libraries(liteinfer_safetensor_test
+target_link_libraries(liteinfer_safetensors_test
     PRIVATE
-        liteinfer_core_safetensor
+        liteinfer_core_safetensors
 )
 
-add_test(NAME liteinfer_safetensor_test COMMAND liteinfer_safetensor_test)
+add_test(NAME liteinfer_safetensors_test COMMAND liteinfer_safetensors_test)
 
 if(UNIX OR WIN32)
     add_executable(liteinfer_filesystem_test

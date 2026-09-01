@@ -1,4 +1,4 @@
-#include "core/safetensor/safetensor_file.hpp"
+#include "core/safetensors/safetensors_file.hpp"
 
 #include <algorithm>
 #include <limits>
@@ -11,7 +11,7 @@
 #include "core/io/io_error.hpp"
 #include "core/json/json.hpp"
 
-namespace liteinfer::core::safetensor
+namespace liteinfer::core::safetensors
 {
 
 namespace
@@ -21,9 +21,9 @@ constexpr std::uint64_t HEADER_SIZE_LIMIT = 100'000'000;
 constexpr std::uint64_t HEADER_PREFIX_SIZE = sizeof(std::uint64_t);
 constexpr std::string_view METADATA_KEY = "__metadata__";
 
-std::expected<std::uint64_t, SafetensorError> parse_unsigned_integer(
+std::expected<std::uint64_t, SafetensorsError> parse_unsigned_integer(
     const json::Document & value,
-    SafetensorErrorCode code,
+    SafetensorsErrorCode code,
     std::string_view message
 )
 {
@@ -38,23 +38,23 @@ std::expected<std::uint64_t, SafetensorError> parse_unsigned_integer(
         }
     }
 
-    return std::unexpected(SafetensorError {code, message});
+    return std::unexpected(SafetensorsError {code, message});
 }
 
-std::expected<std::uint64_t, SafetensorError> parse_shape_dimension(const json::Document & value)
+std::expected<std::uint64_t, SafetensorsError> parse_shape_dimension(const json::Document & value)
 {
     return parse_unsigned_integer(
         value,
-        SafetensorErrorCode::InvalidShape,
+        SafetensorsErrorCode::InvalidShape,
         "Safetensors shape dimension must be a non-negative integer"
     );
 }
 
-std::expected<std::uint64_t, SafetensorError> parse_offset(const json::Document & value)
+std::expected<std::uint64_t, SafetensorsError> parse_offset(const json::Document & value)
 {
     return parse_unsigned_integer(
         value,
-        SafetensorErrorCode::InvalidOffsets,
+        SafetensorsErrorCode::InvalidOffsets,
         "Safetensors data offset must be a non-negative integer"
     );
 }
@@ -78,14 +78,14 @@ std::optional<std::uint64_t> dtype_element_size(std::string_view dtype)
     return std::nullopt;
 }
 
-std::expected<std::uint64_t, SafetensorError> shape_numel(const std::vector<std::uint64_t> & shape)
+std::expected<std::uint64_t, SafetensorsError> shape_numel(const std::vector<std::uint64_t> & shape)
 {
     std::uint64_t numel = 1;
     for (const auto dimension : shape) {
         if (dimension != 0 && numel > std::numeric_limits<std::uint64_t>::max() / dimension)
             [[unlikely]] {
-            return std::unexpected(SafetensorError {
-                SafetensorErrorCode::InvalidShape,
+            return std::unexpected(SafetensorsError {
+                SafetensorsErrorCode::InvalidShape,
                 "Safetensors shape size overflows"
             });
         }
@@ -107,33 +107,33 @@ struct DataRange
     std::string name;
 };
 
-std::expected<TensorDescriptor, SafetensorError>
+std::expected<TensorDescriptor, SafetensorsError>
 parse_tensor_descriptor(const json::Document & value, std::uint64_t data_region_size)
 {
     if (!value.is_object()) [[unlikely]] {
-        return std::unexpected(SafetensorError {
-            SafetensorErrorCode::InvalidTensorInfo,
+        return std::unexpected(SafetensorsError {
+            SafetensorsErrorCode::InvalidTensorInfo,
             "Tensor entry must be a JSON object"
         });
     }
 
     if (!value.contains("dtype") || !value["dtype"].is_string()) [[unlikely]] {
-        return std::unexpected(SafetensorError {
-            SafetensorErrorCode::InvalidDtype,
+        return std::unexpected(SafetensorsError {
+            SafetensorsErrorCode::InvalidDtype,
             "Tensor entry must contain a string dtype"
         });
     }
     const auto dtype = value["dtype"].get<std::string>();
     if (dtype.empty()) [[unlikely]] {
-        return std::unexpected(SafetensorError {
-            SafetensorErrorCode::InvalidDtype,
+        return std::unexpected(SafetensorsError {
+            SafetensorsErrorCode::InvalidDtype,
             "Tensor dtype must not be empty"
         });
     }
 
     if (!value.contains("shape") || !value["shape"].is_array()) [[unlikely]] {
-        return std::unexpected(SafetensorError {
-            SafetensorErrorCode::InvalidShape,
+        return std::unexpected(SafetensorsError {
+            SafetensorsErrorCode::InvalidShape,
             "Tensor entry must contain a shape array"
         });
     }
@@ -153,8 +153,8 @@ parse_tensor_descriptor(const json::Document & value, std::uint64_t data_region_
 
     if (!value.contains("data_offsets") || !value["data_offsets"].is_array() ||
         value["data_offsets"].size() != 2) [[unlikely]] {
-        return std::unexpected(SafetensorError {
-            SafetensorErrorCode::InvalidOffsets,
+        return std::unexpected(SafetensorsError {
+            SafetensorsErrorCode::InvalidOffsets,
             "Tensor entry must contain exactly two data offsets"
         });
     }
@@ -167,23 +167,23 @@ parse_tensor_descriptor(const json::Document & value, std::uint64_t data_region_
         return std::unexpected(std::move(data_end.error()));
     }
     if (*data_begin > *data_end || *data_end > data_region_size) [[unlikely]] {
-        return std::unexpected(SafetensorError {
-            SafetensorErrorCode::InvalidOffsets,
+        return std::unexpected(SafetensorsError {
+            SafetensorsErrorCode::InvalidOffsets,
             "Tensor data offsets are out of range"
         });
     }
 
     if (const auto element_size = dtype_element_size(dtype); element_size.has_value()) {
         if (*numel > std::numeric_limits<std::uint64_t>::max() / *element_size) [[unlikely]] {
-            return std::unexpected(SafetensorError {
-                SafetensorErrorCode::TensorSizeMismatch,
+            return std::unexpected(SafetensorsError {
+                SafetensorsErrorCode::TensorSizeMismatch,
                 "Tensor byte size overflows"
             });
         }
         const auto expected_bytes = *numel * *element_size;
         if (*data_end - *data_begin != expected_bytes) [[unlikely]] {
-            return std::unexpected(SafetensorError {
-                SafetensorErrorCode::TensorSizeMismatch,
+            return std::unexpected(SafetensorsError {
+                SafetensorsErrorCode::TensorSizeMismatch,
                 "Tensor byte size does not match shape"
             });
         }
@@ -192,12 +192,12 @@ parse_tensor_descriptor(const json::Document & value, std::uint64_t data_region_
     return TensorDescriptor {dtype, std::move(shape), *data_begin, *data_end};
 }
 
-std::expected<ParsedHeader, SafetensorError>
+std::expected<ParsedHeader, SafetensorsError>
 parse_header(const json::Document & document, std::uint64_t data_region_size)
 {
     if (!document.is_object()) [[unlikely]] {
-        return std::unexpected(SafetensorError {
-            SafetensorErrorCode::InvalidRoot,
+        return std::unexpected(SafetensorsError {
+            SafetensorsErrorCode::InvalidRoot,
             "Safetensors header root must be an object"
         });
     }
@@ -209,8 +209,8 @@ parse_header(const json::Document & document, std::uint64_t data_region_size)
     for (auto iterator = document.begin(); iterator != document.end(); ++iterator) {
         if (iterator.key() == METADATA_KEY) {
             if (!iterator.value().is_object()) [[unlikely]] {
-                return std::unexpected(SafetensorError {
-                    SafetensorErrorCode::InvalidMetadata,
+                return std::unexpected(SafetensorsError {
+                    SafetensorsErrorCode::InvalidMetadata,
                     "Safetensors metadata must be an object"
                 });
             }
@@ -218,8 +218,8 @@ parse_header(const json::Document & document, std::uint64_t data_region_size)
                  metadata_iterator != iterator.value().end();
                  ++metadata_iterator) {
                 if (!metadata_iterator.value().is_string()) [[unlikely]] {
-                    return std::unexpected(SafetensorError {
-                        SafetensorErrorCode::InvalidMetadata,
+                    return std::unexpected(SafetensorsError {
+                        SafetensorsErrorCode::InvalidMetadata,
                         "Safetensors metadata values must be strings"
                     });
                 }
@@ -247,8 +247,8 @@ parse_header(const json::Document & document, std::uint64_t data_region_size)
     });
     for (std::size_t index = 1; index < ranges.size(); ++index) {
         if (ranges[index].begin < ranges[index - 1].end) [[unlikely]] {
-            return std::unexpected(SafetensorError {
-                SafetensorErrorCode::InvalidOffsets,
+            return std::unexpected(SafetensorsError {
+                SafetensorsErrorCode::InvalidOffsets,
                 "Tensor data ranges overlap"
             });
         }
@@ -259,7 +259,7 @@ parse_header(const json::Document & document, std::uint64_t data_region_size)
 
 } // namespace
 
-SafetensorFile::SafetensorFile(
+SafetensorsFile::SafetensorsFile(
     filesystem::FileHandle file,
     std::uint64_t file_size,
     std::uint64_t data_region_begin,
@@ -273,14 +273,14 @@ SafetensorFile::SafetensorFile(
     , metadata_(std::move(metadata))
 {}
 
-SafetensorFile::SafetensorFile(SafetensorFile &&) noexcept = default;
+SafetensorsFile::SafetensorsFile(SafetensorsFile &&) noexcept = default;
 
-SafetensorFile & SafetensorFile::operator=(SafetensorFile &&) noexcept = default;
+SafetensorsFile & SafetensorsFile::operator=(SafetensorsFile &&) noexcept = default;
 
-SafetensorFile::~SafetensorFile() = default;
+SafetensorsFile::~SafetensorsFile() = default;
 
-std::expected<SafetensorFile, SafetensorError>
-SafetensorFile::open(filesystem::Filesystem & filesystem, const std::filesystem::path & path)
+std::expected<SafetensorsFile, SafetensorsError>
+SafetensorsFile::open(filesystem::Filesystem & filesystem, const std::filesystem::path & path)
 {
     auto file_result = filesystem.open(path);
     if (!file_result) [[unlikely]] {
@@ -294,8 +294,8 @@ SafetensorFile::open(filesystem::Filesystem & filesystem, const std::filesystem:
     }
     const auto file_size = *file_size_result;
     if (file_size < HEADER_PREFIX_SIZE) [[unlikely]] {
-        return std::unexpected(SafetensorError {
-            SafetensorErrorCode::HeaderTooSmall,
+        return std::unexpected(SafetensorsError {
+            SafetensorsErrorCode::HeaderTooSmall,
             "Safetensors file is smaller than its header prefix"
         });
     }
@@ -308,24 +308,24 @@ SafetensorFile::open(filesystem::Filesystem & filesystem, const std::filesystem:
     }
     const auto header_size = *header_size_result;
     if (header_size > HEADER_SIZE_LIMIT) [[unlikely]] {
-        return std::unexpected(SafetensorError {
-            SafetensorErrorCode::HeaderTooLarge,
+        return std::unexpected(SafetensorsError {
+            SafetensorsErrorCode::HeaderTooLarge,
             "Safetensors header exceeds the size limit"
         });
     }
     if (header_size > std::numeric_limits<std::size_t>::max() ||
         header_size > std::numeric_limits<std::uint64_t>::max() - HEADER_PREFIX_SIZE)
         [[unlikely]] {
-        return std::unexpected(SafetensorError {
-            SafetensorErrorCode::InvalidHeaderLength,
+        return std::unexpected(SafetensorsError {
+            SafetensorsErrorCode::InvalidHeaderLength,
             "Safetensors header length overflows"
         });
     }
 
     const auto data_region_begin = HEADER_PREFIX_SIZE + header_size;
     if (data_region_begin > file_size) [[unlikely]] {
-        return std::unexpected(SafetensorError {
-            SafetensorErrorCode::InvalidHeaderLength,
+        return std::unexpected(SafetensorsError {
+            SafetensorsErrorCode::InvalidHeaderLength,
             "Safetensors header exceeds the file size"
         });
     }
@@ -338,8 +338,8 @@ SafetensorFile::open(filesystem::Filesystem & filesystem, const std::filesystem:
 
     if (header_bytes.empty() || std::to_integer<unsigned char>(header_bytes.front()) != '{')
         [[unlikely]] {
-        return std::unexpected(SafetensorError {
-            SafetensorErrorCode::InvalidJson,
+        return std::unexpected(SafetensorsError {
+            SafetensorsErrorCode::InvalidJson,
             "Safetensors header must begin with an object"
         });
     }
@@ -352,8 +352,8 @@ SafetensorFile::open(filesystem::Filesystem & filesystem, const std::filesystem:
     try {
         document = json::Document::parse(header_text);
     } catch (const nlohmann::json::exception &) {
-        return std::unexpected(SafetensorError {
-            SafetensorErrorCode::InvalidJson,
+        return std::unexpected(SafetensorsError {
+            SafetensorsErrorCode::InvalidJson,
             "Safetensors header is not valid JSON"
         });
     }
@@ -364,7 +364,7 @@ SafetensorFile::open(filesystem::Filesystem & filesystem, const std::filesystem:
         return std::unexpected(std::move(parsed_header.error()));
     }
 
-    return SafetensorFile(
+    return SafetensorsFile(
         std::move(file),
         file_size,
         data_region_begin,
@@ -373,7 +373,7 @@ SafetensorFile::open(filesystem::Filesystem & filesystem, const std::filesystem:
     );
 }
 
-std::vector<std::string> SafetensorFile::tensor_names() const
+std::vector<std::string> SafetensorsFile::tensor_names() const
 {
     std::vector<std::string> names;
     names.reserve(tensors_.size());
@@ -383,33 +383,33 @@ std::vector<std::string> SafetensorFile::tensor_names() const
     return names;
 }
 
-std::expected<TensorDescriptor, SafetensorError> SafetensorFile::tensor_info(
+std::expected<TensorDescriptor, SafetensorsError> SafetensorsFile::tensor_info(
     std::string_view name
 ) const
 {
     const auto iterator = tensors_.find(std::string(name));
     if (iterator == tensors_.end()) [[unlikely]] {
-        return std::unexpected(SafetensorError {
-            SafetensorErrorCode::TensorNotFound,
+        return std::unexpected(SafetensorsError {
+            SafetensorsErrorCode::TensorNotFound,
             "Safetensors tensor name was not found"
         });
     }
     return iterator->second;
 }
 
-const std::map<std::string, std::string> & SafetensorFile::metadata() const noexcept
+const std::map<std::string, std::string> & SafetensorsFile::metadata() const noexcept
 {
     return metadata_;
 }
 
-std::expected<std::vector<std::byte>, SafetensorError> SafetensorFile::read_tensor(
+std::expected<std::vector<std::byte>, SafetensorsError> SafetensorsFile::read_tensor(
     std::string_view name
 )
 {
     const auto iterator = tensors_.find(std::string(name));
     if (iterator == tensors_.end()) [[unlikely]] {
-        return std::unexpected(SafetensorError {
-            SafetensorErrorCode::TensorNotFound,
+        return std::unexpected(SafetensorsError {
+            SafetensorsErrorCode::TensorNotFound,
             "Safetensors tensor name was not found"
         });
     }
@@ -419,16 +419,16 @@ std::expected<std::vector<std::byte>, SafetensorError> SafetensorFile::read_tens
     if (byte_count > std::numeric_limits<std::size_t>::max() ||
         descriptor.data_begin > std::numeric_limits<std::uint64_t>::max() - data_region_begin_)
         [[unlikely]] {
-        return std::unexpected(SafetensorError {
-            SafetensorErrorCode::InvalidOffsets,
+        return std::unexpected(SafetensorsError {
+            SafetensorsErrorCode::InvalidOffsets,
             "Safetensors tensor offset cannot be represented"
         });
     }
     const auto absolute_offset = data_region_begin_ + descriptor.data_begin;
     if (byte_count > std::numeric_limits<std::uint64_t>::max() - absolute_offset ||
         absolute_offset + byte_count > file_size_) [[unlikely]] {
-        return std::unexpected(SafetensorError {
-            SafetensorErrorCode::InvalidOffsets,
+        return std::unexpected(SafetensorsError {
+            SafetensorsErrorCode::InvalidOffsets,
             "Safetensors tensor range exceeds the file size"
         });
     }
@@ -460,4 +460,4 @@ std::expected<std::vector<std::byte>, SafetensorError> SafetensorFile::read_tens
     return bytes;
 }
 
-} // namespace liteinfer::core::safetensor
+} // namespace liteinfer::core::safetensors

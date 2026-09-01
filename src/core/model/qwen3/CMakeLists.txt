@@ -20,7 +20,7 @@ target_link_libraries(liteinfer_core_model_qwen3
         liteinfer_core_filesystem
         liteinfer_core_layer
         liteinfer_core_json
-        liteinfer_core_safetensor
+        liteinfer_core_safetensors
     PRIVATE
         liteinfer_core_kernels
         liteinfer_core_io

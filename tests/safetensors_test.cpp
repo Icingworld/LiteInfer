@@ -27,8 +27,8 @@
 #include "core/filesystem/file_handle.hpp"
 #include "core/filesystem/filesystem.hpp"
 #include "core/filesystem/filesystem_error.hpp"
-#include "core/safetensor/safetensor_error.hpp"
-#include "core/safetensor/safetensor_file.hpp"
+#include "core/safetensors/safetensors_error.hpp"
+#include "core/safetensors/safetensors_file.hpp"
 
 namespace
 {
@@ -38,9 +38,9 @@ using filesystem::FileHandle;
 using filesystem::Filesystem;
 using filesystem::FilesystemError;
 using filesystem::FilesystemErrorCode;
-using safetensor::SafetensorError;
-using safetensor::SafetensorErrorCode;
-using safetensor::SafetensorFile;
+using safetensors::SafetensorsError;
+using safetensors::SafetensorsErrorCode;
+using safetensors::SafetensorsFile;
 
 #if defined(_WIN32)
 using NativeFilesystemBackend = filesystem::backend::windows::WindowsFilesystemBackend;
@@ -138,15 +138,15 @@ Filesystem make_filesystem()
     return std::move(*result);
 }
 
-std::expected<SafetensorFile, SafetensorError> open_file(const std::filesystem::path & path)
+std::expected<SafetensorsFile, SafetensorsError> open_file(const std::filesystem::path & path)
 {
     auto filesystem = make_filesystem();
-    return SafetensorFile::open(filesystem, path);
+    return SafetensorsFile::open(filesystem, path);
 }
 
-void assert_safetensor_error(const SafetensorError & error, SafetensorErrorCode expected)
+void assert_safetensor_error(const SafetensorsError & error, SafetensorsErrorCode expected)
 {
-    assert(error.category() == common::ErrorCategory::Safetensor);
+    assert(error.category() == common::ErrorCategory::Safetensors);
     assert(error.code() == std::to_underlying(expected));
 }
 
@@ -238,14 +238,14 @@ void test_header_errors()
     const auto too_small = fixture.write_bytes({std::byte {0x01}, std::byte {0x02}});
     auto too_small_result = open_file(too_small);
     assert(!too_small_result.has_value());
-    assert_safetensor_error(too_small_result.error(), SafetensorErrorCode::HeaderTooSmall);
+    assert_safetensor_error(too_small_result.error(), SafetensorsErrorCode::HeaderTooSmall);
 
     std::vector<std::byte> too_large_bytes;
     append_u64_le(too_large_bytes, 100'000'001);
     const auto too_large = fixture.write_bytes(too_large_bytes);
     auto too_large_result = open_file(too_large);
     assert(!too_large_result.has_value());
-    assert_safetensor_error(too_large_result.error(), SafetensorErrorCode::HeaderTooLarge);
+    assert_safetensor_error(too_large_result.error(), SafetensorsErrorCode::HeaderTooLarge);
 
     std::vector<std::byte> invalid_length_bytes;
     append_u64_le(invalid_length_bytes, 10);
@@ -254,18 +254,18 @@ void test_header_errors()
     assert(!invalid_length_result.has_value());
     assert_safetensor_error(
         invalid_length_result.error(),
-        SafetensorErrorCode::InvalidHeaderLength
+        SafetensorsErrorCode::InvalidHeaderLength
     );
 
     const auto invalid_json = fixture.write(R"({"tensor":)");
     auto invalid_json_result = open_file(invalid_json);
     assert(!invalid_json_result.has_value());
-    assert_safetensor_error(invalid_json_result.error(), SafetensorErrorCode::InvalidJson);
+    assert_safetensor_error(invalid_json_result.error(), SafetensorsErrorCode::InvalidJson);
 
     const auto non_object = fixture.write("[]");
     auto non_object_result = open_file(non_object);
     assert(!non_object_result.has_value());
-    assert_safetensor_error(non_object_result.error(), SafetensorErrorCode::InvalidJson);
+    assert_safetensor_error(non_object_result.error(), SafetensorsErrorCode::InvalidJson);
 }
 
 void test_tensor_and_metadata_validation()
@@ -275,42 +275,42 @@ void test_tensor_and_metadata_validation()
     const auto missing_dtype = fixture.write(R"({"tensor":{"shape":[1],"data_offsets":[0,4]}})");
     auto missing_dtype_result = open_file(missing_dtype);
     assert(!missing_dtype_result.has_value());
-    assert_safetensor_error(missing_dtype_result.error(), SafetensorErrorCode::InvalidDtype);
+    assert_safetensor_error(missing_dtype_result.error(), SafetensorsErrorCode::InvalidDtype);
 
     const auto wrong_shape =
         fixture.write(R"({"tensor":{"dtype":"F32","shape":1,"data_offsets":[0,4]}})");
     auto wrong_shape_result = open_file(wrong_shape);
     assert(!wrong_shape_result.has_value());
-    assert_safetensor_error(wrong_shape_result.error(), SafetensorErrorCode::InvalidShape);
+    assert_safetensor_error(wrong_shape_result.error(), SafetensorsErrorCode::InvalidShape);
 
     const auto missing_offsets = fixture.write(R"({"tensor":{"dtype":"F32","shape":[1]}})");
     auto missing_offsets_result = open_file(missing_offsets);
     assert(!missing_offsets_result.has_value());
-    assert_safetensor_error(missing_offsets_result.error(), SafetensorErrorCode::InvalidOffsets);
+    assert_safetensor_error(missing_offsets_result.error(), SafetensorsErrorCode::InvalidOffsets);
 
     const auto invalid_metadata = fixture.write(R"({"__metadata__":{"format":1}})");
     auto invalid_metadata_result = open_file(invalid_metadata);
     assert(!invalid_metadata_result.has_value());
-    assert_safetensor_error(invalid_metadata_result.error(), SafetensorErrorCode::InvalidMetadata);
+    assert_safetensor_error(invalid_metadata_result.error(), SafetensorsErrorCode::InvalidMetadata);
 
     const auto overflowing_shape = fixture.write(
         R"({"tensor":{"dtype":"CUSTOM","shape":[18446744073709551615,2],"data_offsets":[0,0]}})"
     );
     auto overflowing_shape_result = open_file(overflowing_shape);
     assert(!overflowing_shape_result.has_value());
-    assert_safetensor_error(overflowing_shape_result.error(), SafetensorErrorCode::InvalidShape);
+    assert_safetensor_error(overflowing_shape_result.error(), SafetensorsErrorCode::InvalidShape);
 
     const auto reversed_offsets =
         fixture.write(R"({"tensor":{"dtype":"CUSTOM","shape":[1],"data_offsets":[2,1]}})");
     auto reversed_offsets_result = open_file(reversed_offsets);
     assert(!reversed_offsets_result.has_value());
-    assert_safetensor_error(reversed_offsets_result.error(), SafetensorErrorCode::InvalidOffsets);
+    assert_safetensor_error(reversed_offsets_result.error(), SafetensorsErrorCode::InvalidOffsets);
 
     const auto out_of_range =
         fixture.write(R"({"tensor":{"dtype":"CUSTOM","shape":[1],"data_offsets":[0,1]}})");
     auto out_of_range_result = open_file(out_of_range);
     assert(!out_of_range_result.has_value());
-    assert_safetensor_error(out_of_range_result.error(), SafetensorErrorCode::InvalidOffsets);
+    assert_safetensor_error(out_of_range_result.error(), SafetensorsErrorCode::InvalidOffsets);
 
     const std::vector overlap_data(6, std::byte {0});
     const auto overlapping = fixture.write(
@@ -319,7 +319,7 @@ void test_tensor_and_metadata_validation()
     );
     auto overlapping_result = open_file(overlapping);
     assert(!overlapping_result.has_value());
-    assert_safetensor_error(overlapping_result.error(), SafetensorErrorCode::InvalidOffsets);
+    assert_safetensor_error(overlapping_result.error(), SafetensorsErrorCode::InvalidOffsets);
 
     const std::vector mismatch_data(4, std::byte {0});
     const auto mismatched_size = fixture.write(
@@ -330,7 +330,7 @@ void test_tensor_and_metadata_validation()
     assert(!mismatched_size_result.has_value());
     assert_safetensor_error(
         mismatched_size_result.error(),
-        SafetensorErrorCode::TensorSizeMismatch
+        SafetensorsErrorCode::TensorSizeMismatch
     );
 }
 
@@ -347,11 +347,11 @@ void test_missing_tensor_and_filesystem_error()
 
     auto missing_info = file.tensor_info("missing");
     assert(!missing_info.has_value());
-    assert_safetensor_error(missing_info.error(), SafetensorErrorCode::TensorNotFound);
+    assert_safetensor_error(missing_info.error(), SafetensorsErrorCode::TensorNotFound);
 
     auto missing_bytes = file.read_tensor("missing");
     assert(!missing_bytes.has_value());
-    assert_safetensor_error(missing_bytes.error(), SafetensorErrorCode::TensorNotFound);
+    assert_safetensor_error(missing_bytes.error(), SafetensorsErrorCode::TensorNotFound);
 
     const auto missing_path = fixture.directory() / "missing.safetensors";
     auto missing_file = open_file(missing_path);
@@ -402,7 +402,7 @@ void test_read_error_is_preserved()
     assert(filesystem_result.has_value());
     auto filesystem = std::move(*filesystem_result);
 
-    auto result = SafetensorFile::open(filesystem, "synthetic.safetensors");
+    auto result = SafetensorsFile::open(filesystem, "synthetic.safetensors");
     assert(!result.has_value());
     assert_filesystem_error(result.error(), FilesystemErrorCode::PermissionDenied);
 }

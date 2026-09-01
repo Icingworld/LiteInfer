@@ -20,7 +20,7 @@ enum class ErrorCategory : std::uint8_t
     Model = 4,
     Io = 5,
     Filesystem = 6,
-    Safetensor = 7,
+    Safetensors = 7,
     Tokenizer = 8,
 };
 

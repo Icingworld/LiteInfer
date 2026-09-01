@@ -4,11 +4,11 @@
 
 #include "core/common/error.hpp"
 
-namespace liteinfer::core::safetensor
+namespace liteinfer::core::safetensors
 {
 
-// Safetensor 错误码
-enum class SafetensorErrorCode : std::uint8_t
+// Safetensors 错误码
+enum class SafetensorsErrorCode : std::uint8_t
 {
     HeaderTooSmall = 0,
     HeaderTooLarge = 1,
@@ -24,18 +24,18 @@ enum class SafetensorErrorCode : std::uint8_t
     TensorNotFound = 11,
 };
 
-// Safetensor 错误类型
-using SafetensorError = common::Error;
+// Safetensors 错误类型
+using SafetensorsError = common::Error;
 
-} // namespace liteinfer::core::safetensor
+} // namespace liteinfer::core::safetensors
 
 namespace liteinfer::core::common
 {
 
 template <>
-struct ErrorTraits<safetensor::SafetensorErrorCode>
+struct ErrorTraits<safetensors::SafetensorsErrorCode>
 {
-    static constexpr ErrorCategory category = ErrorCategory::Safetensor;
+    static constexpr ErrorCategory category = ErrorCategory::Safetensors;
 };
 
 } // namespace liteinfer::core::common

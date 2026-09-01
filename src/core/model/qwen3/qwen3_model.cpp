@@ -6,7 +6,7 @@
 #include <string_view>
 #include <utility>
 
-#include "core/safetensor/safetensor_file.hpp"
+#include "core/safetensors/safetensors_file.hpp"
 
 namespace liteinfer::core::model::qwen3
 {
@@ -34,7 +34,7 @@ ModelError invalid_tensor(std::string_view name, std::string_view reason)
 }
 
 std::expected<tensor::Tensor, ModelError> load_f32_tensor(
-    safetensor::SafetensorFile & weights,
+    safetensors::SafetensorsFile & weights,
     std::string_view name,
     const std::vector<std::size_t> & expected_shape
 )
@@ -77,7 +77,7 @@ std::expected<tensor::Tensor, ModelError> load_f32_tensor(
 }
 
 std::expected<layer::Linear, ModelError> load_linear(
-    safetensor::SafetensorFile & weights,
+    safetensors::SafetensorsFile & weights,
     std::string_view weight_name,
     const std::vector<std::size_t> & weight_shape,
     const std::string * bias_name,
@@ -106,7 +106,7 @@ std::expected<layer::Linear, ModelError> load_linear(
 }
 
 std::expected<layer::RMSNorm, ModelError> load_rms_norm(
-    safetensor::SafetensorFile & weights,
+    safetensors::SafetensorsFile & weights,
     std::string_view weight_name,
     std::size_t normalized_size,
     float eps
@@ -150,7 +150,7 @@ Qwen3Model::load(filesystem::Filesystem & filesystem, const std::filesystem::pat
     Qwen3Config config = std::move(*config_result);
 
     auto weights_result =
-        safetensor::SafetensorFile::open(filesystem, model_directory / WEIGHTS_FILE_NAME);
+        safetensors::SafetensorsFile::open(filesystem, model_directory / WEIGHTS_FILE_NAME);
     if (!weights_result) [[unlikely]] {
         return std::unexpected(std::move(weights_result).error());
     }

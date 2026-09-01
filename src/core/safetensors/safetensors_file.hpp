@@ -11,9 +11,9 @@
 
 #include "core/filesystem/file_handle.hpp"
 #include "core/filesystem/filesystem.hpp"
-#include "core/safetensor/safetensor_error.hpp"
+#include "core/safetensors/safetensors_error.hpp"
 
-namespace liteinfer::core::safetensor
+namespace liteinfer::core::safetensors
 {
 
 // Safetensors 中 Tensor 的格式描述。
@@ -28,23 +28,23 @@ struct TensorDescriptor
 
 // Safetensors 只读文件。
 // 对象持有打开后的文件句柄，调用方提供的 Filesystem 只需要存活到 open() 返回。
-class SafetensorFile final
+class SafetensorsFile final
 {
 public:
-    SafetensorFile(const SafetensorFile &) = delete;
+    SafetensorsFile(const SafetensorsFile &) = delete;
 
-    SafetensorFile & operator=(const SafetensorFile &) = delete;
+    SafetensorsFile & operator=(const SafetensorsFile &) = delete;
 
-    SafetensorFile(SafetensorFile &&) noexcept;
+    SafetensorsFile(SafetensorsFile &&) noexcept;
 
-    SafetensorFile & operator=(SafetensorFile &&) noexcept;
+    SafetensorsFile & operator=(SafetensorsFile &&) noexcept;
 
-    ~SafetensorFile();
+    ~SafetensorsFile();
 
 public:
     // 打开并完整校验一个 Safetensors 文件。
     [[nodiscard]]
-    static std::expected<SafetensorFile, SafetensorError>
+    static std::expected<SafetensorsFile, SafetensorsError>
     open(filesystem::Filesystem & filesystem, const std::filesystem::path & path);
 
     // 获取所有 Tensor 名称，名称按字典序返回。
@@ -53,7 +53,7 @@ public:
 
     // 获取指定 Tensor 的格式描述。
     [[nodiscard]]
-    std::expected<TensorDescriptor, SafetensorError> tensor_info(std::string_view name) const;
+    std::expected<TensorDescriptor, SafetensorsError> tensor_info(std::string_view name) const;
 
     // 获取文件元数据。返回的引用在当前对象存活期间有效。
     [[nodiscard]]
@@ -61,10 +61,10 @@ public:
 
     // 读取指定 Tensor 的原始字节。返回拥有数据的副本。
     [[nodiscard]]
-    std::expected<std::vector<std::byte>, SafetensorError> read_tensor(std::string_view name);
+    std::expected<std::vector<std::byte>, SafetensorsError> read_tensor(std::string_view name);
 
 private:
-    SafetensorFile(
+    SafetensorsFile(
         filesystem::FileHandle file,
         std::uint64_t file_size,
         std::uint64_t data_region_begin,
@@ -80,4 +80,4 @@ private:
     std::map<std::string, std::string> metadata_;
 };
 
-} // namespace liteinfer::core::safetensor
+} // namespace liteinfer::core::safetensors
