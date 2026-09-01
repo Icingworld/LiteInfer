@@ -21,6 +21,7 @@ enum class ErrorCategory : std::uint8_t
     Io = 5,
     Filesystem = 6,
     Safetensor = 7,
+    Tokenizer = 8,
 };
 
 // 通用错误类型模板
