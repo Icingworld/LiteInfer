@@ -5,7 +5,7 @@
 namespace liteinfer::core::common::data_type
 {
 
-// BFloat16 8 位整数指数，16 位分数
+// BFloat16：1 位符号位、8 位指数位、7 位分数位
 class BFloat16
 {
 public:
@@ -16,14 +16,14 @@ public:
     explicit BFloat16(float value) noexcept;
 
 public:
-    // 使用原始 binary16 值构造 BFloat16
+    // 使用原始 bfloat16 编码构造 BFloat16
     [[nodiscard]]
     static BFloat16 from_bits(std::uint16_t bits) noexcept;
 
-    // 获取原始 binary16 值
+    // 获取原始 bfloat16 编码
     [[nodiscard]]
     std::uint16_t bits() const noexcept;
-    
+
     // 获取 float32 值，此转换是精确的
     [[nodiscard]]
     float to_float() const noexcept;

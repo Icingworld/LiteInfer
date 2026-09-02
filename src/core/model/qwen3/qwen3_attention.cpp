@@ -23,7 +23,7 @@ ModelError cache_error(const kvcache::KVCacheError & error)
 
 std::expected<std::span<const float>, ModelError> cache_float_storage(const tensor::Tensor & value)
 {
-    if (value.data_type() != tensor::DataType::Float32) [[unlikely]] {
+    if (value.data_type() != common::data_type::DataType::Float32) [[unlikely]] {
         return std::unexpected(
             ModelError(ModelErrorCode::InvalidInput, "Qwen3 KV cache must use Float32")
         );
@@ -231,7 +231,7 @@ std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward_impl(
     }
 
     auto query_rows = tensor::Tensor::from_bytes(
-        tensor::DataType::Float32,
+        common::data_type::DataType::Float32,
         tensor::Shape {query->numel() / head_dim_, head_dim_},
         query->data()
     );
@@ -240,7 +240,7 @@ std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward_impl(
     }
 
     auto key_rows = tensor::Tensor::from_bytes(
-        tensor::DataType::Float32,
+        common::data_type::DataType::Float32,
         tensor::Shape {key->numel() / head_dim_, head_dim_},
         key->data()
     );
@@ -259,12 +259,13 @@ std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward_impl(
     }
 
     auto rotated_query =
-        tensor::Tensor::allocate(tensor::DataType::Float32, normalized_query->shape());
+        tensor::Tensor::allocate(common::data_type::DataType::Float32, normalized_query->shape());
     if (!rotated_query) [[unlikely]] {
         return std::unexpected(std::move(rotated_query).error());
     }
 
-    auto rotated_key = tensor::Tensor::allocate(tensor::DataType::Float32, normalized_key->shape());
+    auto rotated_key =
+        tensor::Tensor::allocate(common::data_type::DataType::Float32, normalized_key->shape());
     if (!rotated_key) [[unlikely]] {
         return std::unexpected(std::move(rotated_key).error());
     }
@@ -377,7 +378,7 @@ std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward_impl(
 
     if (use_cache) {
         auto value_rows = tensor::Tensor::from_bytes(
-            tensor::DataType::Float32,
+            common::data_type::DataType::Float32,
             tensor::Shape {value->numel() / head_dim_, head_dim_},
             value->data()
         );
@@ -392,7 +393,8 @@ std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward_impl(
         }
     }
 
-    auto attention_output = tensor::Tensor::allocate(tensor::DataType::Float32, query->shape());
+    auto attention_output =
+        tensor::Tensor::allocate(common::data_type::DataType::Float32, query->shape());
     if (!attention_output) [[unlikely]] {
         return std::unexpected(std::move(attention_output).error());
     }

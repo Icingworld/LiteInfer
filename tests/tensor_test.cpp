@@ -11,7 +11,8 @@ using namespace liteinfer::core::tensor;
 
 void test_float32_access()
 {
-    auto result = Tensor::allocate(DataType::Float32, Shape {2, 3});
+    auto result =
+        Tensor::allocate(liteinfer::core::common::data_type::DataType::Float32, Shape {2, 3});
     assert(result.has_value());
 
     Tensor tensor = std::move(*result);
@@ -35,7 +36,8 @@ void test_float32_access()
 
 void test_data_type_mismatch()
 {
-    auto result = Tensor::allocate(DataType::Float32, Shape {2});
+    auto result =
+        Tensor::allocate(liteinfer::core::common::data_type::DataType::Float32, Shape {2});
     assert(result.has_value());
 
     const Tensor & tensor = *result;
@@ -46,7 +48,8 @@ void test_data_type_mismatch()
 
 void test_unsupported_cpp_type()
 {
-    auto result = Tensor::allocate(DataType::Float32, Shape {2});
+    auto result =
+        Tensor::allocate(liteinfer::core::common::data_type::DataType::Float32, Shape {2});
     assert(result.has_value());
 
     const Tensor & tensor = *result;
@@ -57,7 +60,8 @@ void test_unsupported_cpp_type()
 
 void test_zero_element_tensor()
 {
-    auto result = Tensor::allocate(DataType::Int32, Shape {0, 4});
+    auto result =
+        Tensor::allocate(liteinfer::core::common::data_type::DataType::Int32, Shape {0, 4});
     assert(result.has_value());
 
     Tensor tensor = std::move(*result);

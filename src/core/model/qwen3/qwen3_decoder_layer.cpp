@@ -17,8 +17,8 @@ add_residual(const tensor::Tensor & residual, const tensor::Tensor & branch_outp
 {
     const auto residual_shape = residual.shape().values();
     const auto branch_shape = branch_output.shape().values();
-    if (residual.data_type() != tensor::DataType::Float32 ||
-        branch_output.data_type() != tensor::DataType::Float32 ||
+    if (residual.data_type() != common::data_type::DataType::Float32 ||
+        branch_output.data_type() != common::data_type::DataType::Float32 ||
         residual_shape.size() != branch_shape.size() ||
         !std::equal(residual_shape.begin(), residual_shape.end(), branch_shape.begin()))
         [[unlikely]] {
@@ -28,7 +28,7 @@ add_residual(const tensor::Tensor & residual, const tensor::Tensor & branch_outp
         ));
     }
 
-    auto output = tensor::Tensor::allocate(tensor::DataType::Float32, residual.shape());
+    auto output = tensor::Tensor::allocate(common::data_type::DataType::Float32, residual.shape());
     if (!output) [[unlikely]] {
         return std::unexpected(std::move(output).error());
     }

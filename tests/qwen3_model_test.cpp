@@ -381,7 +381,10 @@ filesystem::Filesystem make_filesystem()
 
 tensor::Tensor make_token_ids(std::initializer_list<std::int64_t> values)
 {
-    auto result = tensor::Tensor::allocate(tensor::DataType::Int64, tensor::Shape {values.size()});
+    auto result = tensor::Tensor::allocate(
+        liteinfer::core::common::data_type::DataType::Int64,
+        tensor::Shape {values.size()}
+    );
     assert(result.has_value());
 
     auto data = result->data_as<std::int64_t>();
@@ -559,7 +562,10 @@ void test_load_and_forward()
     assert_near((*values)[6], 0.0F);
     assert_near((*values)[7], 0.0F);
 
-    auto batch_input = tensor::Tensor::allocate(tensor::DataType::Int32, tensor::Shape {1, 2});
+    auto batch_input = tensor::Tensor::allocate(
+        liteinfer::core::common::data_type::DataType::Int32,
+        tensor::Shape {1, 2}
+    );
     assert(batch_input.has_value());
     auto batch_values = batch_input->data_as<std::int32_t>();
     assert(batch_values.has_value());
@@ -581,7 +587,7 @@ void test_bfloat16_weights_are_converted_to_float32()
 
     auto output = model_result->forward(make_token_ids({0, 1}));
     assert(output.has_value());
-    assert(output->data_type() == tensor::DataType::Float32);
+    assert(output->data_type() == liteinfer::core::common::data_type::DataType::Float32);
     assert_shape(*output, {2, 4});
 
     auto values = output->data_as<float>();
@@ -600,7 +606,10 @@ void test_forward_validation()
     auto model_result = Qwen3Model::load(filesystem, fixture.directory());
     assert(model_result.has_value());
 
-    auto too_long = tensor::Tensor::allocate(tensor::DataType::Int64, tensor::Shape {9});
+    auto too_long = tensor::Tensor::allocate(
+        liteinfer::core::common::data_type::DataType::Int64,
+        tensor::Shape {9}
+    );
     assert(too_long.has_value());
     auto too_long_result = model_result->forward(*too_long);
     assert(!too_long_result.has_value());

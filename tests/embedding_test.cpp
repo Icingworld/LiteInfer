@@ -12,7 +12,8 @@ using namespace liteinfer::core::tensor;
 
 Embedding make_embedding()
 {
-    auto weight_result = Tensor::allocate(DataType::Float32, Shape {4, 3});
+    auto weight_result =
+        Tensor::allocate(liteinfer::core::common::data_type::DataType::Float32, Shape {4, 3});
     assert(weight_result.has_value());
 
     auto weight_values = weight_result->data_as<float>();
@@ -31,7 +32,8 @@ Embedding make_embedding()
 void test_one_dimensional_input()
 {
     auto embedding = make_embedding();
-    auto input_result = Tensor::allocate(DataType::Int32, Shape {3});
+    auto input_result =
+        Tensor::allocate(liteinfer::core::common::data_type::DataType::Int32, Shape {3});
     assert(input_result.has_value());
 
     auto input_values = input_result->data_as<std::int32_t>();
@@ -57,7 +59,8 @@ void test_one_dimensional_input()
 void test_two_dimensional_input()
 {
     auto embedding = make_embedding();
-    auto input_result = Tensor::allocate(DataType::Int64, Shape {2, 2});
+    auto input_result =
+        Tensor::allocate(liteinfer::core::common::data_type::DataType::Int64, Shape {2, 2});
     assert(input_result.has_value());
 
     auto input_values = input_result->data_as<std::int64_t>();
@@ -99,7 +102,8 @@ void test_invalid_input()
 {
     auto embedding = make_embedding();
 
-    auto negative_result = Tensor::allocate(DataType::Int32, Shape {1});
+    auto negative_result =
+        Tensor::allocate(liteinfer::core::common::data_type::DataType::Int32, Shape {1});
     assert(negative_result.has_value());
     auto negative_values = negative_result->data_as<std::int32_t>();
     assert(negative_values.has_value());
@@ -111,7 +115,8 @@ void test_invalid_input()
         negative_output.error().code() == std::to_underlying(EmbeddingErrorCode::InvalidTokenId)
     );
 
-    auto out_of_range_result = Tensor::allocate(DataType::Int64, Shape {1});
+    auto out_of_range_result =
+        Tensor::allocate(liteinfer::core::common::data_type::DataType::Int64, Shape {1});
     assert(out_of_range_result.has_value());
     auto out_of_range_values = out_of_range_result->data_as<std::int64_t>();
     assert(out_of_range_values.has_value());
@@ -123,7 +128,8 @@ void test_invalid_input()
         out_of_range_output.error().code() == std::to_underlying(EmbeddingErrorCode::InvalidTokenId)
     );
 
-    auto wrong_type_result = Tensor::allocate(DataType::Float32, Shape {1});
+    auto wrong_type_result =
+        Tensor::allocate(liteinfer::core::common::data_type::DataType::Float32, Shape {1});
     assert(wrong_type_result.has_value());
     auto wrong_type_output = embedding.forward(*wrong_type_result);
     assert(!wrong_type_output.has_value());
@@ -132,7 +138,8 @@ void test_invalid_input()
         std::to_underlying(EmbeddingErrorCode::UnsupportedInputDataType)
     );
 
-    auto wrong_rank_result = Tensor::allocate(DataType::Int32, Shape {1, 1, 1});
+    auto wrong_rank_result =
+        Tensor::allocate(liteinfer::core::common::data_type::DataType::Int32, Shape {1, 1, 1});
     assert(wrong_rank_result.has_value());
     auto wrong_rank_output = embedding.forward(*wrong_rank_result);
     assert(!wrong_rank_output.has_value());

@@ -14,7 +14,10 @@ using namespace liteinfer::core;
 
 tensor::Tensor make_float_tensor(tensor::Shape shape, std::initializer_list<float> values)
 {
-    auto result = tensor::Tensor::allocate(tensor::DataType::Float32, std::move(shape));
+    auto result = tensor::Tensor::allocate(
+        liteinfer::core::common::data_type::DataType::Float32,
+        std::move(shape)
+    );
     assert(result.has_value());
 
     auto data = result->data_as<float>();
@@ -44,7 +47,7 @@ kvcache::KVCache make_cache()
             .num_kv_heads = 2,
             .max_seq_len = 4,
             .head_dim = 2,
-            .dtype = tensor::DataType::Float32,
+            .dtype = liteinfer::core::common::data_type::DataType::Float32,
         }
     );
     assert(result.has_value());
@@ -60,7 +63,7 @@ void test_create_and_head_major_write()
     assert(cache.batch_size() == 1);
     assert(cache.num_kv_heads() == 2);
     assert(cache.head_dim() == 2);
-    assert(cache.data_type() == tensor::DataType::Float32);
+    assert(cache.data_type() == liteinfer::core::common::data_type::DataType::Float32);
 
     auto region = cache.begin_append(2);
     assert(region.has_value());
@@ -189,7 +192,7 @@ void test_validation_and_transaction_rules()
             .num_kv_heads = 1,
             .max_seq_len = 4,
             .head_dim = 2,
-            .dtype = tensor::DataType::Float32,
+            .dtype = liteinfer::core::common::data_type::DataType::Float32,
         }
     );
     assert(!invalid_batch.has_value());
@@ -214,8 +217,10 @@ void test_validation_and_transaction_rules()
     );
     auto wrong_head_dim =
         make_float_tensor(tensor::Shape {1, 2, 1, 3}, {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F});
-    auto wrong_dtype =
-        tensor::Tensor::allocate(tensor::DataType::Int32, tensor::Shape {1, 2, 1, 2});
+    auto wrong_dtype = tensor::Tensor::allocate(
+        liteinfer::core::common::data_type::DataType::Int32,
+        tensor::Shape {1, 2, 1, 2}
+    );
     assert(wrong_dtype.has_value());
 
     assert(!cache.write(2, *region, key, value).has_value());

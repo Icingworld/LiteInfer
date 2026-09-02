@@ -13,7 +13,8 @@ using namespace liteinfer::core::tensor;
 
 Tensor make_float_tensor(Shape shape, std::initializer_list<float> values)
 {
-    auto result = Tensor::allocate(DataType::Float32, std::move(shape));
+    auto result =
+        Tensor::allocate(liteinfer::core::common::data_type::DataType::Float32, std::move(shape));
     assert(result.has_value());
 
     auto data = result->data_as<float>();
@@ -78,7 +79,8 @@ void test_forward_preserves_leading_dimensions()
 void test_empty_input()
 {
     auto weight = make_float_tensor(Shape {2, 3}, {1.0F, 2.0F, 3.0F, 4.0F, 5.0F, 6.0F});
-    auto input_result = Tensor::allocate(DataType::Float32, Shape {0, 3});
+    auto input_result =
+        Tensor::allocate(liteinfer::core::common::data_type::DataType::Float32, Shape {0, 3});
     assert(input_result.has_value());
 
     auto linear = Linear::create(std::move(weight));
@@ -104,7 +106,8 @@ void test_create_validation()
     assert(!empty_result.has_value());
     assert(empty_result.error().code() == std::to_underlying(LayerErrorCode::InvalidWeight));
 
-    auto integer_weight_result = Tensor::allocate(DataType::Int32, Shape {2, 2});
+    auto integer_weight_result =
+        Tensor::allocate(liteinfer::core::common::data_type::DataType::Int32, Shape {2, 2});
     assert(integer_weight_result.has_value());
     auto integer_result = Linear::create(std::move(*integer_weight_result));
     assert(!integer_result.has_value());
@@ -130,7 +133,8 @@ void test_forward_validation()
     assert(!wrong_shape_result.has_value());
     assert(wrong_shape_result.error().code() == std::to_underlying(LayerErrorCode::InvalidInput));
 
-    auto integer_input_result = Tensor::allocate(DataType::Int32, Shape {1, 2});
+    auto integer_input_result =
+        Tensor::allocate(liteinfer::core::common::data_type::DataType::Int32, Shape {1, 2});
     assert(integer_input_result.has_value());
     auto integer_result = linear->forward(*integer_input_result);
     assert(!integer_result.has_value());

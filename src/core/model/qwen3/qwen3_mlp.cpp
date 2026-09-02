@@ -55,7 +55,8 @@ std::expected<tensor::Tensor, ModelError> Qwen3MLP::forward(const tensor::Tensor
         return std::unexpected(std::move(up).error());
     }
 
-    auto intermediate = tensor::Tensor::allocate(tensor::DataType::Float32, gate->shape());
+    auto intermediate =
+        tensor::Tensor::allocate(common::data_type::DataType::Float32, gate->shape());
     if (!intermediate) [[unlikely]] {
         return std::unexpected(std::move(intermediate).error());
     }

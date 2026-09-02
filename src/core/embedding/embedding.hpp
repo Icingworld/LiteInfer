@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core/common/data_type/data_type.hpp"
 #include "core/embedding/embedding_error.hpp"
 #include "core/tensor/tensor.hpp"
 
@@ -31,7 +32,7 @@ public:
 
     // 获取数据类型
     [[nodiscard]]
-    tensor::DataType data_type() const noexcept;
+    common::data_type::DataType data_type() const noexcept;
 
 private:
     tensor::Tensor weight_; // 权重矩阵 [vocab_size, embedding_dim]

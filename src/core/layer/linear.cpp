@@ -31,7 +31,7 @@ Linear::create(tensor::Tensor weight, std::optional<tensor::Tensor> bias)
         );
     }
 
-    if (weight.data_type() != tensor::DataType::Float32) [[unlikely]] {
+    if (weight.data_type() != common::data_type::DataType::Float32) [[unlikely]] {
         return std::unexpected(LayerError(
             LayerErrorCode::UnsupportedDataType,
             "Linear weight must use Float32 data type"
@@ -52,7 +52,7 @@ Linear::create(tensor::Tensor weight, std::optional<tensor::Tensor> bias)
             ));
         }
 
-        if (bias->data_type() != tensor::DataType::Float32) [[unlikely]] {
+        if (bias->data_type() != common::data_type::DataType::Float32) [[unlikely]] {
             return std::unexpected(LayerError(
                 LayerErrorCode::UnsupportedDataType,
                 "Linear bias must use Float32 data type"
@@ -84,7 +84,7 @@ std::expected<tensor::Tensor, LayerError> Linear::forward(const tensor::Tensor &
         );
     }
 
-    if (input.data_type() != tensor::DataType::Float32) [[unlikely]] {
+    if (input.data_type() != common::data_type::DataType::Float32) [[unlikely]] {
         return std::unexpected(LayerError(
             LayerErrorCode::UnsupportedDataType,
             "Linear input must use Float32 data type"
@@ -103,7 +103,7 @@ std::expected<tensor::Tensor, LayerError> Linear::forward(const tensor::Tensor &
     output_dimensions.back() = out_features();
 
     auto output = tensor::Tensor::allocate(
-        tensor::DataType::Float32,
+        common::data_type::DataType::Float32,
         tensor::Shape(std::move(output_dimensions))
     );
     if (!output) [[unlikely]] {

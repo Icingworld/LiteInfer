@@ -5,6 +5,7 @@
 #include <optional>
 #include <vector>
 
+#include "core/common/data_type/data_type.hpp"
 #include "core/kvcache/kvcache_error.hpp"
 #include "core/tensor/tensor.hpp"
 
@@ -20,7 +21,7 @@ struct KVCacheConfig
     std::size_t num_kv_heads;
     std::size_t max_seq_len;
     std::size_t head_dim;
-    tensor::DataType dtype;
+    common::data_type::DataType dtype;
 };
 
 // 一次 append 操作预留的序列区间，范围为 [start, end)
@@ -127,7 +128,7 @@ public:
 
     // 返回当前数据类型
     [[nodiscard]]
-    tensor::DataType data_type() const noexcept;
+    common::data_type::DataType data_type() const noexcept;
 
 private:
     struct LayerStorage

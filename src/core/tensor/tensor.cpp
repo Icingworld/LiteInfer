@@ -23,22 +23,22 @@ struct TensorLayout
 
 // 获取数据类型对应每个元素的字节大小
 [[nodiscard]]
-constexpr std::size_t element_size_of(DataType data_type) noexcept
+constexpr std::size_t element_size_of(common::data_type::DataType data_type) noexcept
 {
     switch (data_type) {
-    case DataType::Float16:
+    case common::data_type::DataType::Float16:
         [[fallthrough]];
-    case DataType::BFloat16:
+    case common::data_type::DataType::BFloat16:
         return 2;
-    case DataType::Float32:
+    case common::data_type::DataType::Float32:
         return 4;
-    case DataType::Int8:
+    case common::data_type::DataType::Int8:
         [[fallthrough]];
-    case DataType::Bool:
+    case common::data_type::DataType::Bool:
         return 1;
-    case DataType::Int32:
+    case common::data_type::DataType::Int32:
         return 4;
-    case DataType::Int64:
+    case common::data_type::DataType::Int64:
         return 8;
     default:
         return 0;
@@ -47,7 +47,7 @@ constexpr std::size_t element_size_of(DataType data_type) noexcept
 
 // 获取数据类型对应每个元素的字节大小
 [[nodiscard]]
-std::expected<std::size_t, TensorError> element_size(DataType data_type) noexcept
+std::expected<std::size_t, TensorError> element_size(common::data_type::DataType data_type) noexcept
 {
     const std::size_t size = element_size_of(data_type);
     if (size == 0) [[unlikely]] {
@@ -62,7 +62,7 @@ std::expected<std::size_t, TensorError> element_size(DataType data_type) noexcep
 // 计算 Tensor 的元素个数、元素字节大小与总字节大小
 [[nodiscard]]
 std::expected<TensorLayout, TensorError>
-compute_layout(DataType data_type, const Shape & shape) noexcept
+compute_layout(common::data_type::DataType data_type, const Shape & shape) noexcept
 {
     auto numel = shape.numel();
     if (!numel) [[unlikely]] {
@@ -158,7 +158,7 @@ std::expected<std::size_t, TensorError> compute_storage_span_bytes(
 } // namespace
 
 Tensor::Tensor(
-    DataType data_type,
+    common::data_type::DataType data_type,
     Shape shape,
     Strides strides,
     std::shared_ptr<std::vector<std::byte>> storage,
@@ -204,7 +204,8 @@ Tensor & Tensor::operator=(const Tensor & other)
     return *this;
 }
 
-std::expected<Tensor, TensorError> Tensor::allocate(DataType data_type, Shape shape)
+std::expected<Tensor, TensorError>
+Tensor::allocate(common::data_type::DataType data_type, Shape shape)
 {
     auto layout = compute_layout(data_type, shape);
     if (!layout) [[unlikely]] {
@@ -229,8 +230,11 @@ std::expected<Tensor, TensorError> Tensor::allocate(DataType data_type, Shape sh
     );
 }
 
-std::expected<Tensor, TensorError>
-Tensor::from_bytes(DataType data_type, Shape shape, std::span<const std::byte> bytes)
+std::expected<Tensor, TensorError> Tensor::from_bytes(
+    common::data_type::DataType data_type,
+    Shape shape,
+    std::span<const std::byte> bytes
+)
 {
     auto layout = compute_layout(data_type, shape);
     if (!layout) [[unlikely]] {
@@ -393,7 +397,7 @@ std::expected<void, TensorError> Tensor::copy_from(const Tensor & source)
     return {};
 }
 
-DataType Tensor::data_type() const noexcept
+common::data_type::DataType Tensor::data_type() const noexcept
 {
     return data_type_;
 }

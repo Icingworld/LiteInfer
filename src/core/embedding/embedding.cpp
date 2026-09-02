@@ -95,9 +95,9 @@ std::expected<Embedding, EmbeddingError> Embedding::create(tensor::Tensor weight
             "Weight matrix must be a non-empty tensor"
         ));
     }
-    if (weight.data_type() != tensor::DataType::Float16 &&
-        weight.data_type() != tensor::DataType::Float32 &&
-        weight.data_type() != tensor::DataType::BFloat16) [[unlikely]] {
+    if (weight.data_type() != common::data_type::DataType::Float16 &&
+        weight.data_type() != common::data_type::DataType::Float32 &&
+        weight.data_type() != common::data_type::DataType::BFloat16) [[unlikely]] {
         return std::unexpected(EmbeddingError(
             EmbeddingErrorCode::InvalidWeightMatrix,
             "Weight matrix must be a Float16, Float32 or BFloat16 tensor"
@@ -133,9 +133,9 @@ std::expected<tensor::Tensor, EmbeddingError> Embedding::forward(
     }
 
     switch (token_ids.data_type()) {
-    case tensor::DataType::Int32:
+    case common::data_type::DataType::Int32:
         return lookup<std::int32_t>(weight_, token_ids);
-    case tensor::DataType::Int64:
+    case common::data_type::DataType::Int64:
         return lookup<std::int64_t>(weight_, token_ids);
     [[unlikely]] default:
         return std::unexpected(EmbeddingError(
@@ -157,7 +157,7 @@ std::size_t Embedding::embedding_dim() const noexcept
     return *weight_.shape().extent(1);
 }
 
-tensor::DataType Embedding::data_type() const noexcept
+common::data_type::DataType Embedding::data_type() const noexcept
 {
     return weight_.data_type();
 }

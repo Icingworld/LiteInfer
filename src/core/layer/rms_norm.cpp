@@ -28,7 +28,7 @@ std::expected<RMSNorm, LayerError> RMSNorm::create(tensor::Tensor weight, float 
         );
     }
 
-    if (weight.data_type() != tensor::DataType::Float32) [[unlikely]] {
+    if (weight.data_type() != common::data_type::DataType::Float32) [[unlikely]] {
         return std::unexpected(LayerError(
             LayerErrorCode::UnsupportedDataType,
             "RMSNorm weight must use Float32 data type"
@@ -66,7 +66,7 @@ std::expected<tensor::Tensor, LayerError> RMSNorm::forward(const tensor::Tensor 
         );
     }
 
-    if (input.data_type() != tensor::DataType::Float32) [[unlikely]] {
+    if (input.data_type() != common::data_type::DataType::Float32) [[unlikely]] {
         return std::unexpected(LayerError(
             LayerErrorCode::UnsupportedDataType,
             "RMSNorm input must use Float32 data type"
@@ -83,7 +83,7 @@ std::expected<tensor::Tensor, LayerError> RMSNorm::forward(const tensor::Tensor 
 
     std::vector<std::size_t> output_dimensions(input_shape.begin(), input_shape.end());
     auto output = tensor::Tensor::allocate(
-        tensor::DataType::Float32,
+        common::data_type::DataType::Float32,
         tensor::Shape(std::move(output_dimensions))
     );
     if (!output) [[unlikely]] {

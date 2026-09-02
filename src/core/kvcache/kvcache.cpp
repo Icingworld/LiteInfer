@@ -452,7 +452,7 @@ std::size_t KVCache::head_dim() const noexcept
     return config_.head_dim;
 }
 
-tensor::DataType KVCache::data_type() const noexcept
+common::data_type::DataType KVCache::data_type() const noexcept
 {
     return config_.dtype;
 }

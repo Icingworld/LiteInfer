@@ -9,7 +9,7 @@
 #include <utility>
 #include <vector>
 
-#include "core/tensor/data_type.hpp"
+#include "core/common/data_type/data_type.hpp"
 #include "core/tensor/shape.hpp"
 #include "core/tensor/strides.hpp"
 #include "core/tensor/tensor_error.hpp"
@@ -24,7 +24,7 @@ class Tensor
 {
 private:
     explicit Tensor(
-        DataType data_type,
+        common::data_type::DataType data_type,
         Shape shape,
         Strides strides,
         std::shared_ptr<std::vector<std::byte>> storage,
@@ -47,12 +47,16 @@ public:
 
     // 分配内存并初始化 Tensor
     [[nodiscard]]
-    static std::expected<Tensor, TensorError> allocate(DataType data_type, Shape shape);
+    static std::expected<Tensor, TensorError>
+    allocate(common::data_type::DataType data_type, Shape shape);
 
     // 从字节数组创建 Tensor
     [[nodiscard]]
-    static std::expected<Tensor, TensorError>
-    from_bytes(DataType data_type, Shape shape, std::span<const std::byte> bytes);
+    static std::expected<Tensor, TensorError> from_bytes(
+        common::data_type::DataType data_type,
+        Shape shape,
+        std::span<const std::byte> bytes
+    );
 
     // 沿指定维度创建非拥有 view。view 与源 Tensor 共享底层存储，但保持相同的 strides。
     [[nodiscard]]
@@ -65,7 +69,7 @@ public:
 
     // 获取 Tensor 的数据类型
     [[nodiscard]]
-    DataType data_type() const noexcept;
+    common::data_type::DataType data_type() const noexcept;
 
     // 获取 Tensor 的 Shape
     [[nodiscard]]
@@ -125,7 +129,7 @@ private:
     [[nodiscard]]
     const std::byte * element_pointer(std::size_t linear_index) const noexcept;
 
-    DataType data_type_;
+    common::data_type::DataType data_type_;
     Shape shape_;
     Strides strides_;
     std::shared_ptr<std::vector<std::byte>> storage_;
@@ -140,7 +144,7 @@ std::expected<std::span<const T>, TensorError> Tensor::data_as() const
 {
     using ValueType = std::remove_cv_t<T>;
 
-    if constexpr (!requires { DataTypeOf<ValueType>::value; }) {
+    if constexpr (!requires { common::data_type::DataTypeTraits<ValueType>::value; }) {
         return std::unexpected(
             TensorError(TensorErrorCode::InvalidDataType, "Unsupported C++ tensor data type")
         );
@@ -150,7 +154,7 @@ std::expected<std::span<const T>, TensorError> Tensor::data_as() const
             "Tensor data type is not trivially copyable"
         ));
     } else {
-        if (data_type_ != DataTypeOf<ValueType>::value) {
+        if (data_type_ != common::data_type::DataTypeTraits<ValueType>::value) {
             return std::unexpected(
                 TensorError(TensorErrorCode::DataTypeMismatch, "Tensor data type mismatch")
             );

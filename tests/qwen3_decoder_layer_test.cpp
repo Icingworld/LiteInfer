@@ -21,7 +21,10 @@ using namespace liteinfer::core;
 
 tensor::Tensor make_float_tensor(tensor::Shape shape, std::initializer_list<float> values)
 {
-    auto result = tensor::Tensor::allocate(tensor::DataType::Float32, std::move(shape));
+    auto result = tensor::Tensor::allocate(
+        liteinfer::core::common::data_type::DataType::Float32,
+        std::move(shape)
+    );
     assert(result.has_value());
 
     auto data = result->data_as<float>();
@@ -152,7 +155,10 @@ void test_forward_pre_norm_attention_mlp_and_residuals()
 void test_empty_sequence()
 {
     auto decoder_layer = make_decoder_layer();
-    auto input = tensor::Tensor::allocate(tensor::DataType::Float32, tensor::Shape {1, 0, 2});
+    auto input = tensor::Tensor::allocate(
+        liteinfer::core::common::data_type::DataType::Float32,
+        tensor::Shape {1, 0, 2}
+    );
     assert(input.has_value());
 
     auto output = decoder_layer.forward(*input);

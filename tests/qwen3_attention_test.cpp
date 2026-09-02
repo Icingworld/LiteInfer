@@ -20,7 +20,10 @@ using namespace liteinfer::core;
 
 tensor::Tensor make_float_tensor(tensor::Shape shape, std::initializer_list<float> values)
 {
-    auto result = tensor::Tensor::allocate(tensor::DataType::Float32, std::move(shape));
+    auto result = tensor::Tensor::allocate(
+        liteinfer::core::common::data_type::DataType::Float32,
+        std::move(shape)
+    );
     assert(result.has_value());
 
     auto data = result->data_as<float>();
@@ -40,7 +43,7 @@ make_linear(tensor::Shape shape, std::initializer_list<float> values, bool with_
     std::optional<tensor::Tensor> bias;
     if (with_bias) {
         auto bias_result = tensor::Tensor::allocate(
-            tensor::DataType::Float32,
+            liteinfer::core::common::data_type::DataType::Float32,
             tensor::Shape {*weight.shape().extent(0)}
         );
         assert(bias_result.has_value());
@@ -54,7 +57,10 @@ make_linear(tensor::Shape shape, std::initializer_list<float> values, bool with_
 
 layer::RMSNorm make_norm(std::size_t size, float eps = 1.0e-6F)
 {
-    auto weight = tensor::Tensor::allocate(tensor::DataType::Float32, tensor::Shape {size});
+    auto weight = tensor::Tensor::allocate(
+        liteinfer::core::common::data_type::DataType::Float32,
+        tensor::Shape {size}
+    );
     assert(weight.has_value());
 
     auto values = weight->data_as<float>();
@@ -238,7 +244,10 @@ void test_batches_are_isolated()
 void test_empty_sequence()
 {
     auto attention = make_attention();
-    auto input = tensor::Tensor::allocate(tensor::DataType::Float32, tensor::Shape {1, 0, 4});
+    auto input = tensor::Tensor::allocate(
+        liteinfer::core::common::data_type::DataType::Float32,
+        tensor::Shape {1, 0, 4}
+    );
     assert(input.has_value());
 
     auto output = attention.forward(*input);

@@ -101,8 +101,10 @@ int main(int argc, char ** argv)
     }
     auto model = std::move(*model_result);
 
-    auto token_ids_result =
-        tensor::Tensor::allocate(tensor::DataType::Int64, tensor::Shape {1, token_values.size()});
+    auto token_ids_result = tensor::Tensor::allocate(
+        common::data_type::DataType::Int64,
+        tensor::Shape {1, token_values.size()}
+    );
     if (!token_ids_result) {
         print_error("allocate token IDs", token_ids_result.error());
         return 1;

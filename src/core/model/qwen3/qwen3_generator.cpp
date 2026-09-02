@@ -27,8 +27,10 @@ std::expected<tensor::Tensor, ModelError> make_input_tensor(
     const std::vector<common::TokenId> & token_ids
 )
 {
-    auto input =
-        tensor::Tensor::allocate(tensor::DataType::Int64, tensor::Shape {1, token_ids.size()});
+    auto input = tensor::Tensor::allocate(
+        common::data_type::DataType::Int64,
+        tensor::Shape {1, token_ids.size()}
+    );
     if (!input) [[unlikely]] {
         return std::unexpected(std::move(input).error());
     }
@@ -64,7 +66,7 @@ select_greedy_token(const tensor::Tensor & logits, std::size_t vocab_size)
         );
     }
 
-    if (logits.data_type() != tensor::DataType::Float32) [[unlikely]] {
+    if (logits.data_type() != common::data_type::DataType::Float32) [[unlikely]] {
         return std::unexpected(
             invalid_configuration("Qwen3Model logits must use Float32 data type")
         );

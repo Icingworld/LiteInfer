@@ -116,8 +116,11 @@ std::expected<tensor::Tensor, ModelError> load_float32_tensor(
         float32_bytes = converted;
     }
 
-    auto result =
-        tensor::Tensor::from_bytes(tensor::DataType::Float32, std::move(shape), float32_bytes);
+    auto result = tensor::Tensor::from_bytes(
+        common::data_type::DataType::Float32,
+        std::move(shape),
+        float32_bytes
+    );
     if (!result) [[unlikely]] {
         return std::unexpected(std::move(result).error());
     }
@@ -210,7 +213,8 @@ std::expected<tensor::Tensor, ModelError>
 take_last_logits(const tensor::Tensor & logits, std::size_t sequence_length, std::size_t vocab_size)
 {
     if (sequence_length == 0 || vocab_size == 0 ||
-        logits.data_type() != tensor::DataType::Float32 || !logits.is_contiguous()) [[unlikely]] {
+        logits.data_type() != common::data_type::DataType::Float32 || !logits.is_contiguous())
+        [[unlikely]] {
         return std::unexpected(
             invalid_configuration("Qwen3Model cannot extract logits from an invalid tensor")
         );
@@ -233,8 +237,10 @@ take_last_logits(const tensor::Tensor & logits, std::size_t sequence_length, std
         return std::unexpected(invalid_configuration("Qwen3Model logits size overflows size_t"));
     }
 
-    auto output =
-        tensor::Tensor::allocate(tensor::DataType::Float32, tensor::Shape {1, vocab_size});
+    auto output = tensor::Tensor::allocate(
+        common::data_type::DataType::Float32,
+        tensor::Shape {1, vocab_size}
+    );
     if (!output) [[unlikely]] {
         return std::unexpected(std::move(output).error());
     }
@@ -541,7 +547,7 @@ std::expected<kvcache::KVCache, ModelError> Qwen3Model::create_kv_cache() const
             .num_kv_heads = config_.num_key_value_heads(),
             .max_seq_len = config_.max_position_embeddings(),
             .head_dim = config_.head_dim(),
-            .dtype = tensor::DataType::Float32,
+            .dtype = common::data_type::DataType::Float32,
         }
     );
     if (!result) [[unlikely]] {
