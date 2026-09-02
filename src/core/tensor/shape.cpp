@@ -52,9 +52,4 @@ std::span<const std::size_t> Shape::values() const noexcept
     return dimensions_;
 }
 
-bool Shape::empty() const noexcept
-{
-    return dimensions_.empty();
-}
-
 } // namespace liteinfer::core::tensor

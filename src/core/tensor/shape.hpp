@@ -32,13 +32,9 @@ public:
     [[nodiscard]]
     std::expected<std::size_t, TensorError> numel() const noexcept;
 
-    // 获取 Shape 的视图
+    // 获取 Shape 的底层数据视图
     [[nodiscard]]
     std::span<const std::size_t> values() const noexcept;
-
-    // Shape 是否为空
-    [[nodiscard]]
-    bool empty() const noexcept;
 
 private:
     std::vector<std::size_t> dimensions_;

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <expected>
+#include <initializer_list>
 #include <span>
 #include <vector>
 
@@ -16,6 +17,8 @@ class Strides
 {
 public:
     explicit Strides(std::vector<std::size_t> strides);
+
+    explicit Strides(std::initializer_list<std::size_t> strides);
 
 public:
     // 从 Shape 创建 row-major 步长，如果创建失败则返回错误

@@ -10,6 +10,10 @@ Strides::Strides(std::vector<std::size_t> strides)
     : strides_(std::move(strides))
 {}
 
+Strides::Strides(std::initializer_list<std::size_t> strides)
+    : strides_(strides)
+{}
+
 std::expected<Strides, TensorError> Strides::row_major(const Shape & shape)
 {
     const auto dimensions = shape.values();
