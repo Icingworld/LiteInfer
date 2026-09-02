@@ -14,13 +14,14 @@ namespace liteinfer::core::tensor
 // Tensor 步长
 class Strides
 {
-private:
+public:
     explicit Strides(std::vector<std::size_t> strides);
 
 public:
     // 从 Shape 创建 row-major 步长，如果创建失败则返回错误
+    // 用于以 row-major 来描述一段连续的内存
     [[nodiscard]]
-    static std::expected<Strides, TensorError> from_shape(const Shape & shape);
+    static std::expected<Strides, TensorError> row_major(const Shape & shape);
 
     // 获取 Strides 的秩
     [[nodiscard]]
@@ -30,13 +31,9 @@ public:
     [[nodiscard]]
     std::expected<std::size_t, TensorError> stride(std::size_t index) const noexcept;
 
-    // 获取 Strides 的视图
+    // 获取 Strides 的底层数据视图
     [[nodiscard]]
     std::span<const std::size_t> values() const noexcept;
-
-    // Strides 是否为空
-    [[nodiscard]]
-    bool empty() const noexcept;
 
 private:
     std::vector<std::size_t> strides_;

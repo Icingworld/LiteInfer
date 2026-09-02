@@ -10,7 +10,7 @@ Strides::Strides(std::vector<std::size_t> strides)
     : strides_(std::move(strides))
 {}
 
-std::expected<Strides, TensorError> Strides::from_shape(const Shape & shape)
+std::expected<Strides, TensorError> Strides::row_major(const Shape & shape)
 {
     const auto dimensions = shape.values();
     std::vector<std::size_t> strides(dimensions.size());
@@ -29,6 +29,7 @@ std::expected<Strides, TensorError> Strides::from_shape(const Shape & shape)
 
     return Strides(std::move(strides));
 }
+
 std::size_t Strides::rank() const noexcept
 {
     return strides_.size();
@@ -43,11 +44,6 @@ std::expected<std::size_t, TensorError> Strides::stride(std::size_t index) const
     }
 
     return strides_[index];
-}
-
-bool Strides::empty() const noexcept
-{
-    return strides_.empty();
 }
 
 std::span<const std::size_t> Strides::values() const noexcept
