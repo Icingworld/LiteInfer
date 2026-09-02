@@ -1,5 +1,6 @@
 set(LITEINFER_CORE_COMMON_SOURCES
     data_type/float16.cpp
+    data_type/bfloat16.cpp
 )
 
 add_library(liteinfer_core_common STATIC ${LITEINFER_CORE_COMMON_SOURCES})
