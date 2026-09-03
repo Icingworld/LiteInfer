@@ -26,11 +26,11 @@ public:
 
     // 获取 Shape 指定维度的长度，如果索引越界则返回错误
     [[nodiscard]]
-    std::expected<std::size_t, TensorError> extent(std::size_t index) const noexcept;
+    std::expected<std::size_t, TensorError> extent(std::size_t index) const;
 
     // 计算 Tensor 中一共有多少元素，如果计算失败则返回错误
     [[nodiscard]]
-    std::expected<std::size_t, TensorError> numel() const noexcept;
+    std::expected<std::size_t, TensorError> numel() const;
 
     // 获取 Shape 的底层数据视图
     [[nodiscard]]

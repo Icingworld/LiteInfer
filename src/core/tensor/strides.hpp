@@ -32,7 +32,7 @@ public:
 
     // 获取 Strides 指定维度的步长，如果索引越界则返回错误
     [[nodiscard]]
-    std::expected<std::size_t, TensorError> stride(std::size_t index) const noexcept;
+    std::expected<std::size_t, TensorError> stride(std::size_t index) const;
 
     // 获取 Strides 的底层数据视图
     [[nodiscard]]

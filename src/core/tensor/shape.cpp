@@ -19,7 +19,7 @@ std::size_t Shape::rank() const noexcept
     return dimensions_.size();
 }
 
-std::expected<std::size_t, TensorError> Shape::extent(std::size_t index) const noexcept
+std::expected<std::size_t, TensorError> Shape::extent(std::size_t index) const
 {
     if (index >= dimensions_.size()) [[unlikely]] {
         return std::unexpected(
@@ -30,7 +30,7 @@ std::expected<std::size_t, TensorError> Shape::extent(std::size_t index) const n
     return dimensions_[index];
 }
 
-std::expected<std::size_t, TensorError> Shape::numel() const noexcept
+std::expected<std::size_t, TensorError> Shape::numel() const
 {
     std::size_t result = 1;
 

@@ -39,7 +39,7 @@ std::size_t Strides::rank() const noexcept
     return strides_.size();
 }
 
-std::expected<std::size_t, TensorError> Strides::stride(std::size_t index) const noexcept
+std::expected<std::size_t, TensorError> Strides::stride(std::size_t index) const
 {
     if (index >= strides_.size()) [[unlikely]] {
         return std::unexpected(
