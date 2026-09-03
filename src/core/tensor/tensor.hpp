@@ -11,6 +11,8 @@
 #include "core/common/data_type/data_type.hpp"
 #include "core/tensor/shape.hpp"
 #include "core/tensor/strides.hpp"
+#include "core/tensor/tensor_error.hpp"
+#include "core/tensor/tensor_view.hpp"
 
 namespace liteinfer::core::tensor
 {
@@ -50,7 +52,8 @@ private:
 public:
     // 分配内存并零初始化张量
     [[nodiscard]]
-    static std::expected<Tensor, TensorError> allocate(common::data_type::DataType data_type, Shape shape);
+    static std::expected<Tensor, TensorError>
+    allocate(common::data_type::DataType data_type, Shape shape);
 
     // 从字节数组创建张量
     [[nodiscard]]
@@ -59,6 +62,33 @@ public:
         Shape shape,
         std::span<const std::byte> bytes
     );
+
+    // 获取当前张量的可写/只读根视图，不复制底层数据。
+    // view 只允许从左值 Tensor 创建，避免直接从临时对象借用存储。
+    [[nodiscard]]
+    TensorView as_view() &;
+
+    [[nodiscard]]
+    ConstTensorView as_view() const &;
+
+    TensorView as_view() && = delete;
+
+    ConstTensorView as_view() const && = delete;
+
+    // 沿指定维度创建非持有子视图。子视图保持源 Tensor 的步长。
+    [[nodiscard]]
+    std::expected<TensorView, TensorError>
+    narrow(std::size_t dimension, std::size_t start, std::size_t length) &;
+
+    [[nodiscard]]
+    std::expected<ConstTensorView, TensorError>
+    narrow(std::size_t dimension, std::size_t start, std::size_t length) const &;
+
+    std::expected<TensorView, TensorError>
+    narrow(std::size_t dimension, std::size_t start, std::size_t length) && = delete;
+
+    std::expected<ConstTensorView, TensorError>
+    narrow(std::size_t dimension, std::size_t start, std::size_t length) const && = delete;
 
     // 获取张量的数据类型
     [[nodiscard]]
@@ -96,13 +126,17 @@ public:
     [[nodiscard]]
     std::span<const std::byte> data() const noexcept;
 
+    // 将 source 的逻辑元素复制到当前连续 Tensor。
+    [[nodiscard]]
+    std::expected<void, TensorError> copy_from(ConstTensorView source);
+
     // 获取张量的底层数据视图，并转换为指定类型，如果类型不一致则返回错误
-    template <TensorElementType T>
+    template <typename T>
     [[nodiscard]]
     std::expected<std::span<T>, TensorError> data_as();
 
     // 获取张量的底层数据只读视图，并转换为指定类型，如果类型不一致则返回错误
-    template <TensorElementType T>
+    template <typename T>
     [[nodiscard]]
     std::expected<std::span<const T>, TensorError> data_as() const;
 
@@ -115,33 +149,41 @@ private:
     std::size_t element_size_;
 };
 
-template <TensorElementType T>
+template <typename T>
 std::expected<std::span<const T>, TensorError> Tensor::data_as() const
 {
     using ValueType = std::remove_cv_t<T>;
 
-    if (data_type_ != common::data_type::DataTypeTraits<ValueType>::value) [[unlikely]] {
+    if constexpr (!requires {
+                      common::data_type::DataTypeTraits<ValueType>::value;
+                  } || !std::is_trivially_copyable_v<ValueType>) {
         return std::unexpected(
-            TensorError(TensorErrorCode::DataTypeMismatch, "Tensor data type mismatch")
+            TensorError(TensorErrorCode::InvalidDataType, "Unsupported C++ tensor data type")
         );
-    }
+    } else {
+        if (data_type_ != common::data_type::DataTypeTraits<ValueType>::value) [[unlikely]] {
+            return std::unexpected(
+                TensorError(TensorErrorCode::DataTypeMismatch, "Tensor data type mismatch")
+            );
+        }
 
-    if (numel_ == 0) {
-        return std::span<const T>();
-    }
+        if (numel_ == 0) {
+            return std::span<const T>();
+        }
 
-    const auto raw_data = data();
-    const auto address = reinterpret_cast<std::uintptr_t>(raw_data.data());
-    if (address % alignof(ValueType) != 0) [[unlikely]] {
-        return std::unexpected(
-            TensorError(TensorErrorCode::InvalidDataAlignment, "Tensor data alignment mismatch")
-        );
-    }
+        const auto raw_data = data();
+        const auto address = reinterpret_cast<std::uintptr_t>(raw_data.data());
+        if (address % alignof(ValueType) != 0) [[unlikely]] {
+            return std::unexpected(
+                TensorError(TensorErrorCode::InvalidDataAlignment, "Tensor data alignment mismatch")
+            );
+        }
 
-    return std::span<const T>(reinterpret_cast<const T *>(raw_data.data()), numel_);
+        return std::span<const T>(reinterpret_cast<const T *>(raw_data.data()), numel_);
+    }
 }
 
-template <TensorElementType T>
+template <typename T>
 std::expected<std::span<T>, TensorError> Tensor::data_as()
 {
     using ValueType = std::remove_cv_t<T>;

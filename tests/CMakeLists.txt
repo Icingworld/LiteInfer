@@ -17,6 +17,17 @@ target_link_libraries(liteinfer_tensor_test
 
 add_test(NAME liteinfer_tensor_test COMMAND liteinfer_tensor_test)
 
+add_executable(liteinfer_tensor_view_test
+    tensor_view_test.cpp
+)
+
+target_link_libraries(liteinfer_tensor_view_test
+    PRIVATE
+        liteinfer_core_tensor
+)
+
+add_test(NAME liteinfer_tensor_view_test COMMAND liteinfer_tensor_view_test)
+
 add_executable(liteinfer_data_type_test
     data_type_test.cpp
 )

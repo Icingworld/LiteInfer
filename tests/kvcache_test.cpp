@@ -30,7 +30,7 @@ tensor::Tensor make_float_tensor(tensor::Shape shape, std::initializer_list<floa
     return std::move(*result);
 }
 
-tensor::Tensor materialize(const tensor::Tensor & view)
+tensor::Tensor materialize(const tensor::ConstTensorView & view)
 {
     auto result = tensor::Tensor::allocate(view.data_type(), view.shape());
     assert(result.has_value());

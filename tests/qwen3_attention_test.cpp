@@ -252,7 +252,7 @@ void test_empty_sequence()
 
     auto output = attention.forward(*input);
     assert(output.has_value());
-    assert(output->empty());
+    assert(output->numel() == 0);
     assert(*output->shape().extent(0) == 1);
     assert(*output->shape().extent(1) == 0);
     assert(*output->shape().extent(2) == 4);

@@ -2,6 +2,7 @@ set(LITEINFER_CORE_TENSOR_SOURCES
     shape.cpp
     strides.cpp
     tensor.cpp
+    tensor_view.cpp
 )
 
 add_library(liteinfer_core_tensor STATIC ${LITEINFER_CORE_TENSOR_SOURCES})

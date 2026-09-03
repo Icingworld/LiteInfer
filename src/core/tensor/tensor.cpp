@@ -19,7 +19,8 @@ struct TensorLayout
 
 // 计算 Tensor 的元素个数、元素字节大小与总字节大小
 [[nodiscard]]
-std::expected<TensorLayout, TensorError> compute_layout(common::data_type::DataType data_type, const Shape & shape)
+std::expected<TensorLayout, TensorError>
+compute_layout(common::data_type::DataType data_type, const Shape & shape)
 {
     auto numel = shape.numel();
     if (!numel) [[unlikely]] {
@@ -47,8 +48,11 @@ std::expected<TensorLayout, TensorError> compute_layout(common::data_type::DataT
     case common::data_type::DataType::Int64:
         element_size = 8;
         break;
-    [[unlikely]] default:
-        return std::unexpected(TensorError(TensorErrorCode::InvalidDataType, "Unsupported tensor data type"));
+    [[unlikely]]
+    default:
+        return std::unexpected(
+            TensorError(TensorErrorCode::InvalidDataType, "Unsupported tensor data type")
+        );
     }
 
     const std::size_t count = *numel;
@@ -81,7 +85,8 @@ Tensor::Tensor(
     , element_size_(element_size)
 {}
 
-std::expected<Tensor, TensorError> Tensor::allocate(common::data_type::DataType data_type, Shape shape)
+std::expected<Tensor, TensorError>
+Tensor::allocate(common::data_type::DataType data_type, Shape shape)
 {
     auto layout = compute_layout(data_type, shape);
     if (!layout) [[unlikely]] {
@@ -105,7 +110,11 @@ std::expected<Tensor, TensorError> Tensor::allocate(common::data_type::DataType 
     );
 }
 
-std::expected<Tensor, TensorError> Tensor::from_bytes(common::data_type::DataType data_type, Shape shape, std::span<const std::byte> bytes)
+std::expected<Tensor, TensorError> Tensor::from_bytes(
+    common::data_type::DataType data_type,
+    Shape shape,
+    std::span<const std::byte> bytes
+)
 {
     auto layout = compute_layout(data_type, shape);
     if (!layout) [[unlikely]] {
@@ -113,7 +122,9 @@ std::expected<Tensor, TensorError> Tensor::from_bytes(common::data_type::DataTyp
     }
 
     if (bytes.size() != layout->bytes) [[unlikely]] {
-        return std::unexpected(TensorError(TensorErrorCode::InvalidByteSize, "Tensor byte size mismatch"));
+        return std::unexpected(
+            TensorError(TensorErrorCode::InvalidByteSize, "Tensor byte size mismatch")
+        );
     }
 
     auto strides = Strides::row_major(shape);
@@ -131,6 +142,16 @@ std::expected<Tensor, TensorError> Tensor::from_bytes(common::data_type::DataTyp
         layout->numel,
         layout->element_size
     );
+}
+
+TensorView Tensor::as_view() &
+{
+    return TensorView(data_type_, shape_, strides_, data(), numel_, element_size_);
+}
+
+ConstTensorView Tensor::as_view() const &
+{
+    return ConstTensorView(data_type_, shape_, strides_, data(), numel_, element_size_);
 }
 
 common::data_type::DataType Tensor::data_type() const noexcept
@@ -193,6 +214,11 @@ std::span<std::byte> Tensor::data() noexcept
 std::span<const std::byte> Tensor::data() const noexcept
 {
     return std::span<const std::byte>(storage_.data(), storage_.size());
+}
+
+std::expected<void, TensorError> Tensor::copy_from(ConstTensorView source)
+{
+    return detail::copy_view(as_view(), source);
 }
 
 } // namespace liteinfer::core::tensor

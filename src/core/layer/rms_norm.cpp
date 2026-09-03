@@ -105,7 +105,7 @@ std::expected<tensor::Tensor, LayerError> RMSNorm::forward(const tensor::Tensor 
         return std::unexpected(std::move(output_values).error());
     }
 
-    if (!input.empty()) {
+    if (input.numel() != 0) {
         kernels::rms_norm_f32(
             *input_values,
             *weight_values,

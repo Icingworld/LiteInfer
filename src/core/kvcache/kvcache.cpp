@@ -299,10 +299,10 @@ std::expected<void, KVCacheError> KVCache::write(
         );
     }
 
-    if (auto result = key_view->copy_from(key); !result) [[unlikely]] {
+    if (auto result = key_view->copy_from(key.as_view()); !result) [[unlikely]] {
         return std::unexpected(error(KVCacheErrorCode::ShapeMismatch, result.error().message()));
     }
-    if (auto result = value_view->copy_from(value); !result) [[unlikely]] {
+    if (auto result = value_view->copy_from(value.as_view()); !result) [[unlikely]] {
         return std::unexpected(error(KVCacheErrorCode::ShapeMismatch, result.error().message()));
     }
     if (auto result = mark_layer_written(layer_index); !result) [[unlikely]] {

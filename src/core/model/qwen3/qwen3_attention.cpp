@@ -21,7 +21,9 @@ ModelError cache_error(const kvcache::KVCacheError & error)
     return ModelError(ModelErrorCode::InvalidInput, error.message());
 }
 
-std::expected<std::span<const float>, ModelError> cache_float_storage(const tensor::Tensor & value)
+std::expected<std::span<const float>, ModelError> cache_float_storage(
+    const tensor::ConstTensorView & value
+)
 {
     if (value.data_type() != common::data_type::DataType::Float32) [[unlikely]] {
         return std::unexpected(
@@ -210,7 +212,7 @@ std::expected<tensor::Tensor, ModelError> Qwen3Attention::forward_impl(
         return std::unexpected(std::move(query).error());
     }
 
-    if (input.empty()) [[unlikely]] {
+    if (input.numel() == 0) [[unlikely]] {
         if (use_cache) [[unlikely]] {
             return std::unexpected(ModelError(
                 ModelErrorCode::InvalidInput,

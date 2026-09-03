@@ -8,6 +8,7 @@
 #include "core/common/data_type/data_type.hpp"
 #include "core/kvcache/kvcache_error.hpp"
 #include "core/tensor/tensor.hpp"
+#include "core/tensor/tensor_view.hpp"
 
 namespace liteinfer::core::kvcache
 {
@@ -32,12 +33,12 @@ struct KVCacheRegion
     std::size_t end;
 };
 
-// KV cache 的零拷贝前缀视图
-// key/value 是沿序列维度创建的 Tensor view，共享每层预分配的底层存储
+// KV cache 的零拷贝前缀视图。
+// key/value 借用 KVCache 的底层存储，使用者不能让它们超过所属 KVCache 的生命周期。
 struct KVCacheView
 {
-    tensor::Tensor key;
-    tensor::Tensor value;
+    tensor::ConstTensorView key;
+    tensor::ConstTensorView value;
     std::size_t length;
 };
 

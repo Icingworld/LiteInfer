@@ -19,9 +19,9 @@ void test_float32_access()
     assert(tensor.rank() == 2);
     assert(tensor.numel() == 6);
     assert(tensor.element_size() == sizeof(float));
-    assert(tensor.bytes() == 6 * sizeof(float));
+    assert(tensor.data().size() == 6 * sizeof(float));
     assert(tensor.is_contiguous());
-    assert(!tensor.empty());
+    assert(tensor.numel() != 0);
 
     auto values = tensor.data_as<float>();
     assert(values.has_value());
@@ -66,7 +66,6 @@ void test_zero_element_tensor()
 
     Tensor tensor = std::move(*result);
     assert(tensor.numel() == 0);
-    assert(tensor.empty());
 
     auto values = tensor.data_as<std::int32_t>();
     assert(values.has_value());

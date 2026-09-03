@@ -131,7 +131,7 @@ int main(int argc, char ** argv)
         return 1;
     }
 
-    if (logits.empty()) {
+    if (logits.numel() == 0) {
         std::cerr << "Qwen3 forward returned empty logits\n";
         return 1;
     }

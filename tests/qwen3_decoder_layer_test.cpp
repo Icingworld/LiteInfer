@@ -163,7 +163,7 @@ void test_empty_sequence()
 
     auto output = decoder_layer.forward(*input);
     assert(output.has_value());
-    assert(output->empty());
+    assert(output->numel() == 0);
     assert(output->shape().values()[0] == 1);
     assert(output->shape().values()[1] == 0);
     assert(output->shape().values()[2] == 2);

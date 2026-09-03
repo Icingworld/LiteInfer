@@ -88,7 +88,7 @@ void test_empty_input()
 
     auto output = linear->forward(*input_result);
     assert(output.has_value());
-    assert(output->empty());
+    assert(output->numel() == 0);
     assert(output->shape().rank() == 2);
     assert(*output->shape().extent(0) == 0);
     assert(*output->shape().extent(1) == 2);
