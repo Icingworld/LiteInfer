@@ -17,6 +17,7 @@ namespace liteinfer::core::tensor
 
 // 张量元素类型概念
 // 必须能够被 common::data_type::DataTypeTraits 识别
+// 且是平凡可复制类型，当前实现中的类型均满足要求
 template <typename T>
 concept TensorElementType = requires {
     common::data_type::DataTypeTraits<std::remove_cv_t<T>>::value;
@@ -49,8 +50,7 @@ private:
 public:
     // 分配内存并零初始化张量
     [[nodiscard]]
-    static std::expected<Tensor, TensorError>
-    allocate(common::data_type::DataType data_type, Shape shape);
+    static std::expected<Tensor, TensorError> allocate(common::data_type::DataType data_type, Shape shape);
 
     // 从字节数组创建张量
     [[nodiscard]]
@@ -148,7 +148,7 @@ std::expected<std::span<T>, TensorError> Tensor::data_as()
 
     const Tensor & self = *this;
     auto view = self.data_as<ValueType>();
-    if (!view) {
+    if (!view) [[unlikely]] {
         return std::unexpected(std::move(view).error());
     }
 
